@@ -181,16 +181,20 @@
     check();
   }
 
+  let lastEvidence = [];
+
   function buildFromDescription() {
     state.description = document.getElementById('description').value;
     const res = FC.extract.extract(state.description);
     Object.keys(res.values).forEach((k) => { state.profile.values[k] = res.values[k]; });
     Object.keys(res.params).forEach((k) => { state.profile.params[k] = res.params[k]; });
     res.marks.forEach((m) => { if (state.profile.marks.indexOf(m) === -1) state.profile.marks.push(m); });
+    lastEvidence = res.evidence;
     FC.ui.sync(state.profile);
     FC.ui.renderEvidence(res.evidence);
     render();
     pushHistory();
+    return res;
   }
 
   /* ---------- версии ---------- */
@@ -248,27 +252,93 @@
     return c;
   }
 
-  /* ---------- подбор «выбери похожее» (итеративное сближение) ---------- */
+  /* ---------- подбор лиц (итеративное сближение «выбери похожее») ----------
+   * Два входа в один механизм:
+   *   • «по описанию» — центр берётся из разобранного текста, названные признаки
+   *     фиксируются замком, галерея варьирует только неупомянутое;
+   *   • «выбери похожее» — старт от текущего портрета без замков.
+   */
   let evolveState = null;
 
-  function openEvolve() {
-    const radius = parseFloat(document.getElementById('evolve-radius').value) || 0.8;
-    evolveState = { center: FC.evolve.clone(state.profile), radius: radius, gen: 1, cells: [], selected: new Set() };
+  // Открыть подбор. opts.fromDescription=true → режим «по описанию» с замками.
+  function openEvolve(opts) {
+    opts = opts || {};
+    const desc = !!opts.fromDescription;
+    const radius = desc ? 0.95 : (parseFloat(document.getElementById('evolve-radius').value) || 0.8);
+    const lockKeys = desc ? [...FC.evolve.locksFromEvidence(lastEvidence)] : [];
+    evolveState = {
+      mode: desc ? 'desc' : 'manual',
+      center: FC.evolve.clone(state.profile),
+      radius: radius, gen: 1, cells: [], selected: new Set(),
+      lockKeys: lockKeys, locks: new Set(lockKeys),
+    };
+    document.getElementById('evolve-radius').value = radius;
+    applyEvolveMode();
+    renderEvolveLocks();
     renderEvolveGrid();
     document.getElementById('evolve-overlay').style.display = 'flex';
   }
   function closeEvolve() { document.getElementById('evolve-overlay').style.display = 'none'; }
 
+  function applyEvolveMode() {
+    const title = document.getElementById('evolve-title');
+    const sub = document.getElementById('evolve-subtitle');
+    if (evolveState.mode === 'desc') {
+      title.textContent = 'Подбор лица по описанию';
+      sub.textContent = 'Лица собраны по вашему описанию. Зафиксированные признаки (замки ниже) не меняются — снимите замок, чтобы признак тоже варьировался. Отметьте 1–2 наиболее похожих и нажмите «Новое поколение».';
+    } else {
+      title.textContent = 'Подбор лица — «выбери похожее»';
+      sub.textContent = 'Отметьте 1–2 наиболее похожих варианта и нажмите «Новое поколение» — система сблизится к цели. «Применить» перенесёт выбранный вариант в портрет.';
+    }
+  }
+
+  // Подпись замка: «Нос: Прямой» для категорий, имя ползунка для числовых.
+  function lockLabel(key) {
+    const sd = FC.traits.selectDef(key);
+    if (sd) return sd.label + ': ' + FC.traits.optionLabel(key, evolveState.center.values[key]);
+    const sl = FC.traits.SLIDERS.find((s) => s.key === key);
+    return sl ? sl.label : key;
+  }
+
+  function renderEvolveLocks() {
+    const host = document.getElementById('evolve-locks');
+    if (!host) return;
+    host.innerHTML = '';
+    if (evolveState.mode !== 'desc' || !evolveState.lockKeys.length) {
+      host.style.display = 'none';
+      return;
+    }
+    host.style.display = 'flex';
+    host.appendChild(Object.assign(document.createElement('span'),
+      { className: 'locks-title', textContent: 'Из описания зафиксировано:' }));
+    evolveState.lockKeys.forEach((key) => {
+      const chip = document.createElement('button');
+      const on = evolveState.locks.has(key);
+      chip.className = 'lock-chip' + (on ? '' : ' off');
+      chip.innerHTML = (on ? '🔒 ' : '🔓 ') + lockLabel(key);
+      chip.title = on ? 'Признак зафиксирован — нажмите, чтобы он тоже варьировался'
+                      : 'Признак варьируется — нажмите, чтобы зафиксировать';
+      chip.addEventListener('click', () => {
+        if (evolveState.locks.has(key)) evolveState.locks.delete(key);
+        else evolveState.locks.add(key);
+        renderEvolveLocks();
+        renderEvolveGrid();
+      });
+      host.appendChild(chip);
+    });
+  }
+
   function renderEvolveGrid() {
     const host = document.getElementById('evolve-grid');
     host.innerHTML = '';
-    evolveState.cells = FC.evolve.generation(evolveState.center, evolveState.radius, 9);
+    evolveState.cells = FC.evolve.generation(evolveState.center, evolveState.radius, 9, evolveState.locks);
     evolveState.selected = new Set();
+    const anchorTag = evolveState.mode === 'desc' ? 'по описанию' : 'текущий';
     evolveState.cells.forEach((prof, i) => {
       const card = document.createElement('div');
       card.className = 'evolve-card';
       card.innerHTML = FC.render.buildSVG(prof) +
-        (i === 0 ? '<span class="tag">текущий</span>' : '') +
+        (i === 0 ? '<span class="tag">' + anchorTag + '</span>' : '') +
         '<span class="pick">✓</span>';
       card.addEventListener('click', () => {
         if (evolveState.selected.has(i)) { evolveState.selected.delete(i); card.classList.remove('selected'); }
@@ -283,11 +353,12 @@
   function evolveNext() {
     const sel = [...evolveState.selected].map((i) => evolveState.cells[i]);
     if (sel.length) {
-      evolveState.center = FC.evolve.average(sel);
+      evolveState.center = FC.evolve.average(sel, evolveState.locks);
       evolveState.radius = Math.max(0.2, evolveState.radius * 0.72); // сужаем разброс
       document.getElementById('evolve-radius').value = evolveState.radius;
     }
     evolveState.gen += 1;
+    renderEvolveLocks(); // подписи замков зависят от центра — мог измениться
     renderEvolveGrid();
   }
 
@@ -300,14 +371,25 @@
     const sel = [...evolveState.selected];
     let chosen;
     if (sel.length === 1) chosen = evolveState.cells[sel[0]];
-    else if (sel.length > 1) chosen = FC.evolve.average(sel.map((i) => evolveState.cells[i]));
+    else if (sel.length > 1) chosen = FC.evolve.average(sel.map((i) => evolveState.cells[i]), evolveState.locks);
     else chosen = evolveState.center;
     state.profile = FC.evolve.clone(chosen);
     FC.ui.sync(state.profile);
     render();
     pushHistory();
     closeEvolve();
-    toast('Вариант применён к портрету');
+    toast('Вариант применён — доработайте чертами справа');
+  }
+
+  // Вход «по описанию»: гарантируем, что портрет/evidence собраны из текста.
+  function suggestFromDescription() {
+    const text = document.getElementById('description').value.trim();
+    if (!text) { toast('Сначала введите описание внешности'); return; }
+    if (text !== state.description || !lastEvidence.length) buildFromDescription();
+    if (!FC.evolve.locksFromEvidence(lastEvidence).size) {
+      toast('В описании не распознано опорных черт — подбор пойдёт свободно');
+    }
+    openEvolve({ fromDescription: true });
   }
 
   function currentSVG(transparent) {
@@ -373,7 +455,8 @@
       if (k === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
       else if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); redo(); }
     });
-    document.getElementById('btn-evolve').addEventListener('click', openEvolve);
+    document.getElementById('btn-evolve').addEventListener('click', () => openEvolve());
+    document.getElementById('btn-suggest').addEventListener('click', suggestFromDescription);
     document.getElementById('btn-close-evolve').addEventListener('click', closeEvolve);
     document.getElementById('btn-evolve-next').addEventListener('click', evolveNext);
     document.getElementById('btn-evolve-random').addEventListener('click', evolveMore);

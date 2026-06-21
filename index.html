@@ -44,6 +44,7 @@
         <textarea id="description" placeholder="Например: мужчина лет сорока, овальное лицо, тёмные короткие волосы, густые брови, прямой нос, карие глаза, короткая борода, шрам на щеке, очки..."></textarea>
         <button id="btn-voice" class="wide voice" title="Офлайн-распознавание речи (в приложении)">🎤 Диктовать описание</button>
         <button id="btn-extract" class="wide primary">Собрать по описанию ▸</button>
+        <button id="btn-suggest" class="wide" title="Показать галерею лиц, согласованных с описанием, и сузить выбор">Подобрать лица по описанию ▸</button>
         <div class="presets-label">Примеры для демонстрации:</div>
         <div id="presets" class="presets"></div>
       </div>
@@ -103,11 +104,12 @@
     <div class="overlay-box evolve-box">
       <div class="overlay-head">
         <div>
-          <h3>Подбор лица — «выбери похожее»</h3>
-          <div class="muted">Отметьте 1–2 наиболее похожих варианта и нажмите «Новое поколение» — система сблизится к цели. «Применить» перенесёт выбранный вариант в портрет.</div>
+          <h3 id="evolve-title">Подбор лица — «выбери похожее»</h3>
+          <div id="evolve-subtitle" class="muted">Отметьте 1–2 наиболее похожих варианта и нажмите «Новое поколение» — система сблизится к цели. «Применить» перенесёт выбранный вариант в портрет.</div>
         </div>
         <button id="btn-close-evolve" class="tb">Закрыть</button>
       </div>
+      <div id="evolve-locks" class="evolve-locks"></div>
       <div id="evolve-grid" class="evolve-grid"></div>
       <div class="evolve-controls">
         <label class="ev-slider">Сила изменений
