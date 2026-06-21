@@ -23,6 +23,8 @@
   const STROKE = '#43362e';
   const STROKE_W = 3;
 
+  let BUILD_SEQ = 0; // счётчик для уникальных id на каждый собранный SVG
+
   // Относительные полуширины головы на 6 уровнях сверху вниз
   // (лоб, висок, бровь/глаз, скула, щека/челюсть-верх, челюсть-низ).
   const SHAPE = {
@@ -348,6 +350,30 @@
       ' Z" fill="' + shade(col, 0.85) + '"/>';
   }
 
+  // Блик, тень и пряди внутри массы волос (отсечены её же контуром) — убирают
+  // эффект «плоской шапки». Свет сверху-слева, тень справа.
+  function hairSheen(d, col, m, withStrands) {
+    const light = shade(col, 1.34);
+    const dark = shade(col, 0.66);
+    const crownY = TOP_Y + (m.browLineY - TOP_Y) * 0.34;
+    const ry = (m.browLineY - TOP_Y) * 0.36;
+    let s = '<clipPath id="hairClip"><path d="' + d + '"/></clipPath>';
+    s += '<g clip-path="url(#hairClip)" filter="url(#softBlur)">' +
+      '<ellipse cx="' + n(CX - m.half * 0.34) + '" cy="' + n(crownY) + '" rx="' + n(m.half * 0.52) + '" ry="' + n(ry) + '" fill="' + light + '" opacity="0.55"/>' +
+      '<ellipse cx="' + n(CX + m.half * 0.44) + '" cy="' + n(crownY + 16) + '" rx="' + n(m.half * 0.42) + '" ry="' + n(ry * 1.15) + '" fill="' + dark + '" opacity="0.5"/>' +
+      '</g>';
+    if (withStrands) {
+      s += '<g clip-path="url(#hairClip)" stroke="' + light + '" stroke-width="1.2" fill="none" opacity="0.38">';
+      for (let i = -3; i <= 3; i++) {
+        const startX = CX + i * m.half * 0.17;
+        s += '<path d="M ' + n(startX) + ' ' + n(TOP_Y + 2) +
+          ' Q ' + n(startX + i * 10) + ' ' + n(crownY + 22) + ' ' + n(CX + i * m.half * 0.44) + ' ' + n(m.browLineY) + '"/>';
+      }
+      s += '</g>';
+    }
+    return s;
+  }
+
   function hairFront(m, profile) {
     const style = profile.values.hairStyle;
     if (style === 'bald') return '';
@@ -375,7 +401,8 @@
       path += ' C ' + n(rx + 14) + ' ' + n(TOP_Y + 30) + ' ' + n(CX + 70) + ' ' + n(topArc) + ' ' + n(CX) + ' ' + n(topArc) +
         ' C ' + n(CX - 70) + ' ' + n(topArc) + ' ' + n(lx - 14) + ' ' + n(TOP_Y + 30) + ' ' + n(lx) + ' ' + n(hairlineY) + ' Z';
       const fill = style === 'buzz' ? shade(col, 0.9) : col;
-      return '<path d="' + path + '" fill="' + fill + '" stroke="' + line + '" stroke-width="1.5"/>';
+      return '<path d="' + path + '" fill="' + fill + '" stroke="' + line + '" stroke-width="1.5"/>' +
+        hairSheen(path, fill, m, false);
     }
 
     // средние/длинные/кудрявые/пучок — объёмная масса сверху и по бокам
@@ -390,6 +417,7 @@
       ' C ' + n(CX + wx * 0.45) + ' ' + n(hairlineY + 8) + ' ' + n(CX + wx * 0.16) + ' ' + n(hairlineY + 3) + ' ' + n(CX + wx * 0.04) + ' ' + n(hairlineY + 6) +
       ' C ' + n(CX - wx * 0.18) + ' ' + n(hairlineY + 12) + ' ' + n(CX - wx * 0.45) + ' ' + n(hairlineY + 10) + ' ' + n(lx + 2) + ' ' + n(sideY) + ' Z';
     let s = '<path d="' + edge + '" fill="' + col + '" stroke="' + line + '" stroke-width="1.5"/>';
+    s += hairSheen(edge, col, m, !bumpy); // у кудрей объём дают сами клубы, пряди не нужны
     if (style === 'bun') {
       s += '<circle cx="' + n(CX) + '" cy="' + n(TOP_Y - 10) + '" r="26" fill="' + col + '" stroke="' + line + '" stroke-width="1.5"/>';
     }
@@ -621,7 +649,14 @@
       marksGroup(m, profile),
     ];
 
-    const inner = parts.join('');
+    // Все id (градиенты, фильтры, clipPath) делаем уникальными на каждый вызов.
+    // Иначе при нескольких лицах в одном HTML-документе (галерея подбора, лист-
+    // ориентировка) ссылки url(#id) резолвятся в ПЕРВЫЙ элемент — и все лица
+    // наследуют кожу/глаза/отсечки первого. Сквозной суффикс это исключает.
+    const uid = 'u' + (BUILD_SEQ++);
+    let inner = parts.join('')
+      .replace(/id="(\w+)"/g, 'id="$1-' + uid + '"')
+      .replace(/url\(#(\w+)\)/g, 'url(#$1-' + uid + ')');
     // bare — вернуть только содержимое (для вкладывания в лист-ориентировку)
     if (opts.bare) return inner;
     return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + VIEW_W + ' ' + VIEW_H + '" ' +
