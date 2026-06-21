@@ -1,0 +1,54 @@
+name: Build & Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          py -m pip install --upgrade pip
+          py -m pip install -r requirements.txt pyinstaller
+
+      - name: Download Vosk model
+        run: |
+          $url = "https://alphacephei.com/vosk/models/vosk-model-small-ru-0.22.zip"
+          Invoke-WebRequest $url -OutFile vosk-ru.zip
+          Expand-Archive vosk-ru.zip -DestinationPath models
+        shell: pwsh
+
+      - name: Build exe
+        run: build_exe.bat
+        shell: cmd
+
+      - name: Archive release
+        run: |
+          Compress-Archive -Path dist\FaceComposite\* -DestinationPath FaceComposite-${{ github.ref_name }}-win64.zip
+        shell: pwsh
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: FaceComposite-${{ github.ref_name }}-win64.zip
+          body: |
+            ## Фоторобот — конструктор ${{ github.ref_name }}
+
+            ### Установка
+            1. Скачать `FaceComposite-${{ github.ref_name }}-win64.zip`
+            2. Распаковать в любую папку
+            3. Запустить `FaceComposite.exe`
+
+            Требования: Windows 10/11, WebView2 Runtime (есть по умолчанию).
+            Интернет **не нужен** — всё работает офлайн.
