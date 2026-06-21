@@ -137,21 +137,41 @@
   function eye(ex, ey, ew, eh, tiltOuter, side, eyeColorHex, id) {
     const outerX = ex + side * ew, innerX = ex - side * ew;
     const outerY = ey + tiltOuter, innerY = ey - tiltOuter * 0.3;
+    const cy = (outerY + innerY) / 2;
     const topMidY = Math.min(outerY, innerY) - eh;
     const botMidY = Math.max(outerY, innerY) + eh;
+    const upperArc = 'M ' + n(innerX) + ' ' + n(innerY) + ' Q ' + n(ex) + ' ' + n(topMidY) + ' ' + n(outerX) + ' ' + n(outerY);
+    const lowerArc = 'M ' + n(innerX) + ' ' + n(innerY) + ' Q ' + n(ex) + ' ' + n(botMidY) + ' ' + n(outerX) + ' ' + n(outerY);
     const lens = 'M ' + n(innerX) + ' ' + n(innerY) +
       ' Q ' + n(ex) + ' ' + n(topMidY) + ' ' + n(outerX) + ' ' + n(outerY) +
       ' Q ' + n(ex) + ' ' + n(botMidY) + ' ' + n(innerX) + ' ' + n(innerY) + ' Z';
-    const irisR = eh * 1.02;
+    const irisR = eh * 1.05;
+    const irisLight = shade(eyeColorHex, 1.5);
+    const irisDark = shade(eyeColorHex, 0.55);
     return '' +
+      '<radialGradient id="iris' + id + '" cx="50%" cy="40%" r="62%">' +
+        '<stop offset="0" stop-color="' + irisLight + '"/>' +
+        '<stop offset="0.6" stop-color="' + eyeColorHex + '"/>' +
+        '<stop offset="1" stop-color="' + irisDark + '"/>' +
+      '</radialGradient>' +
       '<clipPath id="clip' + id + '"><path d="' + lens + '"/></clipPath>' +
-      '<path d="' + lens + '" fill="#fdfcfa"/>' +
+      '<path d="' + lens + '" fill="#f7f4ef"/>' +
       '<g clip-path="url(#clip' + id + ')">' +
-        '<circle cx="' + n(ex) + '" cy="' + n((outerY + innerY) / 2) + '" r="' + n(irisR) + '" fill="' + eyeColorHex + '"/>' +
-        '<circle cx="' + n(ex) + '" cy="' + n((outerY + innerY) / 2) + '" r="' + n(irisR * 0.46) + '" fill="#1a1414"/>' +
-        '<circle cx="' + n(ex + side * irisR * 0.3) + '" cy="' + n((outerY + innerY) / 2 - irisR * 0.3) + '" r="' + n(irisR * 0.16) + '" fill="#ffffff" opacity="0.8"/>' +
+        // лёгкая тень склеры от верхнего века
+        '<path d="' + upperArc + ' L ' + n(outerX) + ' ' + n(outerY - eh) + ' L ' + n(innerX) + ' ' + n(innerY - eh) + ' Z" fill="#000000" opacity="0.10"/>' +
+        '<circle cx="' + n(ex) + '" cy="' + n(cy) + '" r="' + n(irisR) + '" fill="url(#iris' + id + ')"/>' +
+        // лимбальное кольцо — тёмный ободок радужки (даёт «живой» взгляд)
+        '<circle cx="' + n(ex) + '" cy="' + n(cy) + '" r="' + n(irisR) + '" fill="none" stroke="' + irisDark + '" stroke-width="1.4" opacity="0.75"/>' +
+        '<circle cx="' + n(ex) + '" cy="' + n(cy) + '" r="' + n(irisR * 0.42) + '" fill="#130f0f"/>' +
+        // два блика: крупный сверху-снаружи и слабый снизу
+        '<circle cx="' + n(ex + side * irisR * 0.32) + '" cy="' + n(cy - irisR * 0.34) + '" r="' + n(irisR * 0.18) + '" fill="#ffffff" opacity="0.92"/>' +
+        '<circle cx="' + n(ex - side * irisR * 0.2) + '" cy="' + n(cy + irisR * 0.32) + '" r="' + n(irisR * 0.08) + '" fill="#ffffff" opacity="0.5"/>' +
       '</g>' +
-      '<path d="' + lens + '" fill="none" stroke="' + STROKE + '" stroke-width="2.4"/>';
+      // верхняя линия ресниц (толще/темнее) и нижнее веко (тоньше)
+      '<path d="' + upperArc + '" fill="none" stroke="' + STROKE + '" stroke-width="2.6" stroke-linecap="round"/>' +
+      '<path d="' + lowerArc + '" fill="none" stroke="' + STROKE + '" stroke-width="1.3" opacity="0.5"/>' +
+      // слёзник у внутреннего угла
+      '<circle cx="' + n(innerX + side * 2.5) + '" cy="' + n(innerY + 1) + '" r="2.3" fill="#c9897d" opacity="0.7"/>';
   }
 
   function eyesGroup(m, profile) {
@@ -222,13 +242,22 @@
     if (type === 'narrow') baseW = 12 * p.noseSize;
     const bridgeX = 6;
     let bridge = '';
-    // боковая линия носа (правая)
+    // боковые крылья носа: в анфас спинка почти не обведена — лёгкий намёк снизу,
+    // основной объём даёт мягкая тень (см. shading). Видимая часть начинается
+    // от середины и усиливается книзу, поэтому переход к крыльям читается, а
+    // «жирной» линии вдоль всего носа нет.
     const ctrlX = type === 'hooked' ? bridgeX + 7 : bridgeX;
+    const midY = (topY + botY) / 2;
     [+1, -1].forEach((side) => {
-      bridge += '<path d="M ' + n(CX + side * bridgeX) + ' ' + n(topY) +
-        ' C ' + n(CX + side * ctrlX) + ' ' + n((topY + botY) / 2) + ' ' + n(CX + side * baseW * 0.7) + ' ' + n(botY - 12) + ' ' + n(CX + side * baseW) + ' ' + n(botY) +
-        '" fill="none" stroke="' + STROKE + '" stroke-width="2.2" opacity="0.6"/>';
+      bridge += '<path d="M ' + n(CX + side * (bridgeX + 1)) + ' ' + n(midY) +
+        ' C ' + n(CX + side * ctrlX) + ' ' + n(midY + (botY - midY) * 0.4) + ' ' + n(CX + side * baseW * 0.7) + ' ' + n(botY - 12) + ' ' + n(CX + side * baseW) + ' ' + n(botY) +
+        '" fill="none" stroke="' + STROKE + '" stroke-width="1.8" opacity="0.32"/>';
     });
+    // для носа с горбинкой — короткий штрих на спинке сверху (профильная примета)
+    if (type === 'hooked') {
+      bridge += '<path d="M ' + n(CX - 4) + ' ' + n(topY + 4) + ' Q ' + n(CX + 6) + ' ' + n(midY - 6) + ' ' + n(CX - 2) + ' ' + n(midY) +
+        '" fill="none" stroke="' + STROKE + '" stroke-width="1.6" opacity="0.3"/>';
+    }
     // основание/ноздри
     let tipY = botY;
     if (type === 'upturned') tipY = botY - 6;
@@ -252,16 +281,34 @@
     if (type === 'wide') { mw = 52 * p.mouthSize; lipH = 9; }
     const y = m.mouthY;
     const half = mw / 2;
-    const lipFill = '#b9756a';
-    // верхняя губа с «луком купидона»
+    const base = m.gender === 'female' ? '#c0746a' : '#b07064';
+    const upperFill = shade(base, 0.82);   // верхняя губа в тени — темнее
+    const lowerFill = shade(base, 1.08);   // нижняя ловит свет — светлее
+    const edge = shade(base, 0.6);
+    // верхняя губа с «луком купидона», вниз до линии рта
     const upper = 'M ' + n(CX - half) + ' ' + n(y) +
       ' Q ' + n(CX - half * 0.5) + ' ' + n(y - lipH) + ' ' + n(CX) + ' ' + n(y - lipH * 0.35) +
       ' Q ' + n(CX + half * 0.5) + ' ' + n(y - lipH) + ' ' + n(CX + half) + ' ' + n(y) +
-      ' Q ' + n(CX + half * 0.5) + ' ' + n(y + lipH * 1.3) + ' ' + n(CX) + ' ' + n(y + lipH * 1.4) +
-      ' Q ' + n(CX - half * 0.5) + ' ' + n(y + lipH * 1.3) + ' ' + n(CX - half) + ' ' + n(y) + ' Z';
+      ' Q ' + n(CX + half * 0.5) + ' ' + n(y + 1.5) + ' ' + n(CX) + ' ' + n(y + 2) +
+      ' Q ' + n(CX - half * 0.5) + ' ' + n(y + 1.5) + ' ' + n(CX - half) + ' ' + n(y) + ' Z';
+    // нижняя губа — полная, объёмная
+    const lower = 'M ' + n(CX - half) + ' ' + n(y) +
+      ' Q ' + n(CX) + ' ' + n(y + 2) + ' ' + n(CX + half) + ' ' + n(y) +
+      ' Q ' + n(CX + half * 0.42) + ' ' + n(y + lipH * 1.7) + ' ' + n(CX) + ' ' + n(y + lipH * 1.8) +
+      ' Q ' + n(CX - half * 0.42) + ' ' + n(y + lipH * 1.7) + ' ' + n(CX - half) + ' ' + n(y) + ' Z';
+    // линия смыкания губ — самая тёмная
     const line = '<path d="M ' + n(CX - half) + ' ' + n(y) + ' Q ' + n(CX) + ' ' + n(y + 2) + ' ' + n(CX + half) + ' ' + n(y) +
-      '" fill="none" stroke="' + shade(lipFill, 0.6) + '" stroke-width="2"/>';
-    return '<path d="' + upper + '" fill="' + lipFill + '" stroke="' + shade(lipFill, 0.7) + '" stroke-width="1.6"/>' + line;
+      '" fill="none" stroke="' + shade(base, 0.42) + '" stroke-width="2.2" stroke-linecap="round"/>';
+    // блик на нижней губе
+    const hi = softEllipse(CX, y + lipH * 0.95, half * 0.5, lipH * 0.42, 0, 0.6, 'url(#hi)');
+    // желобок над губой (фильтрум) — две мягкие бороздки
+    const philtrum =
+      '<path d="M ' + n(CX - 3) + ' ' + n(y - lipH * 1.15) + ' L ' + n(CX - 3) + ' ' + n(y - lipH * 0.35) + '" stroke="' + shade(base, 0.7) + '" stroke-width="1.2" opacity="0.3" fill="none"/>' +
+      '<path d="M ' + n(CX + 3) + ' ' + n(y - lipH * 1.15) + ' L ' + n(CX + 3) + ' ' + n(y - lipH * 0.35) + '" stroke="' + shade(base, 0.7) + '" stroke-width="1.2" opacity="0.3" fill="none"/>';
+    return philtrum +
+      '<path d="' + lower + '" fill="' + lowerFill + '" stroke="' + edge + '" stroke-width="1.4"/>' +
+      '<path d="' + upper + '" fill="' + upperFill + '" stroke="' + edge + '" stroke-width="1.4"/>' +
+      hi + line;
   }
 
   function earsGroup(m, profile, skin, skinLine) {
@@ -456,13 +503,13 @@
 
   /* ---------- объём: градиенты и мягкие тени ---------- */
   function defs(skin) {
-    const light = shade(skin, 1.10);
-    const mid = shade(skin, 0.88);
-    const sh = shade(skin, 0.5);
+    const light = shade(skin, 1.12);
+    const mid = shade(skin, 0.86);
+    const sh = shade(skin, 0.45);
     return '<defs>' +
-      '<radialGradient id="skinGrad" cx="50%" cy="36%" r="65%">' +
+      '<radialGradient id="skinGrad" cx="48%" cy="34%" r="68%">' +
         '<stop offset="0" stop-color="' + light + '"/>' +
-        '<stop offset="0.65" stop-color="' + skin + '"/>' +
+        '<stop offset="0.6" stop-color="' + skin + '"/>' +
         '<stop offset="1" stop-color="' + mid + '"/>' +
       '</radialGradient>' +
       '<radialGradient id="softShadow" cx="50%" cy="50%" r="50%">' +
@@ -470,13 +517,21 @@
         '<stop offset="1" stop-color="' + sh + '" stop-opacity="0"/>' +
       '</radialGradient>' +
       '<radialGradient id="blush" cx="50%" cy="50%" r="50%">' +
-        '<stop offset="0" stop-color="#d98a78" stop-opacity="0.28"/>' +
+        '<stop offset="0" stop-color="#d98a78" stop-opacity="0.30"/>' +
         '<stop offset="1" stop-color="#d98a78" stop-opacity="0"/>' +
       '</radialGradient>' +
       '<radialGradient id="hi" cx="50%" cy="50%" r="50%">' +
-        '<stop offset="0" stop-color="#fff6ea" stop-opacity="0.42"/>' +
+        '<stop offset="0" stop-color="#fff6ea" stop-opacity="0.5"/>' +
         '<stop offset="1" stop-color="#fff6ea" stop-opacity="0"/>' +
       '</radialGradient>' +
+      // мягкое размытие контурных теней — главный приём для «объёма», а не плоскости
+      '<filter id="softBlur" x="-25%" y="-25%" width="150%" height="150%">' +
+        '<feGaussianBlur stdDeviation="5"/></filter>' +
+      // тонкая текстура кожи (мелкая крапчатость) — убирает «винил» плоской заливки
+      '<filter id="skinTexture" x="0" y="0" width="100%" height="100%">' +
+        '<feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="11" result="n"/>' +
+        '<feColorMatrix in="n" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.35 0"/>' +
+      '</filter>' +
       '</defs>';
   }
 
@@ -487,34 +542,45 @@
   }
 
   // Мягкие тени поверх кожи (под чертами) — дают объём плоской заливке.
+  // Тени собраны в группу под размытием — переходы света становятся плавными.
   function shading(m, profile) {
     const female = m.gender === 'female';
-    let s = '';
+    const old = m.age === 'senior' || m.age === 'middle';
+    let sh = '';
     // височно-скуловые впадины по бокам
     [+1, -1].forEach((side) => {
-      s += softEllipse(CX + side * m.halves[3] * 0.88, m.eyeLineY + 6, 24, 62, side * -10, 0.4);
-      s += softEllipse(CX + side * m.halves[4] * 0.86, m.noseBottomY + 6, 22, 38, side * 14, 0.36);
+      sh += softEllipse(CX + side * m.halves[3] * 0.9, m.eyeLineY + 6, 26, 66, side * -10, 0.4);
+      sh += softEllipse(CX + side * m.halves[4] * 0.88, m.noseBottomY + 6, 24, 40, side * 14, 0.36);
     });
-    // мягкая направленная тень со стороны носа (одна сторона — естественнее)
-    s += softEllipse(CX + 8, (m.noseTopY + m.noseBottomY) / 2 + 6, 8, (m.noseBottomY - m.noseTopY) / 2, 4, 0.32);
-    // под нижней губой
-    s += softEllipse(CX, m.mouthY + 20, 22, 10, 0, 0.3);
-    // под подбородком (на шее)
-    s += softEllipse(CX, m.chinY + 8, m.halves[5] * 0.8, 14, 0, 0.45);
+    // направленная тень со стороны носа + лёгкая тень под кончиком (объём носа)
+    sh += softEllipse(CX + 9, (m.noseTopY + m.noseBottomY) / 2 + 6, 9, (m.noseBottomY - m.noseTopY) / 2, 4, 0.34);
+    sh += softEllipse(CX, m.noseBottomY + 9, 17, 8, 0, 0.3);
+    // под нижней губой и под подбородком (на шее)
+    sh += softEllipse(CX, m.mouthY + 22, 24, 11, 0, 0.3);
+    sh += softEllipse(CX, m.chinY + 8, m.halves[5] * 0.8, 14, 0, 0.45);
+    // носогубные складки — только для среднего/пожилого возраста
+    if (old) {
+      [+1, -1].forEach((side) => {
+        sh += softEllipse(CX + side * 24, m.mouthY - 6, 7, 24, side * 12, 0.26);
+      });
+    }
 
-    // блики — единый мягкий свет сверху: лоб, спинка носа, скулы, подбородок
-    s += softEllipse(CX, m.browLineY - m.faceH * 0.13, m.half * 0.42, m.faceH * 0.07, 0, 0.6, 'url(#hi)');
-    s += softEllipse(CX - 5, (m.noseTopY + m.noseBottomY) / 2, 5, (m.noseBottomY - m.noseTopY) / 2 * 0.8, -3, 0.55, 'url(#hi)');
+    // блики — единый мягкий свет сверху: лоб, спинка и кончик носа, скулы, подбородок
+    let li = '';
+    li += softEllipse(CX, m.browLineY - m.faceH * 0.13, m.half * 0.44, m.faceH * 0.075, 0, 0.6, 'url(#hi)');
+    li += softEllipse(CX - 4, (m.noseTopY + m.noseBottomY) / 2, 5, (m.noseBottomY - m.noseTopY) / 2 * 0.8, -3, 0.6, 'url(#hi)');
+    li += softEllipse(CX, m.noseBottomY - 2, 6, 5, 0, 0.55, 'url(#hi)');
     [+1, -1].forEach((side) => {
-      s += softEllipse(CX + side * m.halves[3] * 0.5, m.eyeLineY + 20, 22, 16, side * 8, 0.45, 'url(#hi)');
+      li += softEllipse(CX + side * m.halves[3] * 0.5, m.eyeLineY + 20, 24, 17, side * 8, 0.45, 'url(#hi)');
     });
-    s += softEllipse(CX, m.chinY - 20, 16, 12, 0, 0.4, 'url(#hi)');
+    li += softEllipse(CX, m.chinY - 20, 17, 13, 0, 0.4, 'url(#hi)');
 
     // лёгкий румянец на щеках
+    let bl = '';
     [+1, -1].forEach((side) => {
-      s += softEllipse(CX + side * m.halves[4] * 0.6, m.noseBottomY + 2, 20, 14, 0, female ? 0.9 : 0.5, 'url(#blush)');
+      bl += softEllipse(CX + side * m.halves[4] * 0.6, m.noseBottomY + 2, 20, 14, 0, female ? 0.9 : 0.5, 'url(#blush)');
     });
-    return s;
+    return '<g filter="url(#softBlur)">' + sh + '</g>' + li + bl;
   }
 
   /* ---------- сборка ---------- */
@@ -536,11 +602,14 @@
 
     const parts = [
       defs(skin),
+      '<clipPath id="headClip"><path d="' + head + '"/></clipPath>',
       bg,
       hairBack(m, profile),
       neck,
       earsGroup(m, profile, skin, skinLine),
-      '<path d="' + head + '" fill="url(#skinGrad)" stroke="' + skinLine + '" stroke-width="' + STROKE_W + '"/>',
+      '<path d="' + head + '" fill="url(#skinGrad)" stroke="' + skinLine + '" stroke-width="2.5"/>',
+      // тонкая текстура кожи поверх заливки, отсечённая контуром лица
+      '<g clip-path="url(#headClip)"><rect x="0" y="0" width="' + VIEW_W + '" height="' + VIEW_H + '" filter="url(#skinTexture)" opacity="0.5"/></g>',
       shading(m, profile),
       facialHairGroup(m, profile),
       browsGroup(m, profile),
