@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Фоторобот — конструктор (MVP)</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <!-- Верхняя панель -->
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">◉</span>
+      <span>Фоторобот<span class="brand-sub"> · конструктор</span></span>
+    </div>
+    <div class="case-meta">
+      <input id="case-title" class="meta-title" placeholder="Название карточки">
+      <input id="case-operator" class="meta-op" placeholder="Оператор">
+      <select id="case-subject" class="meta-subject">
+        <option value="suspect">Разыскиваемый</option>
+        <option value="missing">Пропавший</option>
+        <option value="other">Иное</option>
+      </select>
+    </div>
+    <div class="toolbar">
+      <button id="btn-new" class="tb">Новая</button>
+      <button id="btn-save-version" class="tb primary">Сохранить версию</button>
+      <button id="btn-save-project" class="tb">Сохранить проект</button>
+      <button id="btn-projects" class="tb">Проекты</button>
+      <span class="sep"></span>
+      <button id="btn-export-sheet" class="tb primary">Ориентировка</button>
+      <button id="btn-export-png" class="tb">PNG</button>
+      <button id="btn-export-svg" class="tb">SVG</button>
+      <button id="btn-export-json" class="tb">.json</button>
+      <label class="tb file-label">Загрузить<input id="file-import" type="file" accept=".json,application/json" hidden></label>
+    </div>
+  </header>
+
+  <main class="layout">
+    <!-- Левая колонка: описание + распознанное + версии -->
+    <section class="col col-left">
+      <div class="card">
+        <h3>Словесное описание</h3>
+        <textarea id="description" placeholder="Например: мужчина лет сорока, овальное лицо, тёмные короткие волосы, густые брови, прямой нос, карие глаза, короткая борода, шрам на щеке, очки..."></textarea>
+        <button id="btn-voice" class="wide voice" title="Офлайн-распознавание речи (в приложении)">🎤 Диктовать описание</button>
+        <button id="btn-extract" class="wide primary">Собрать по описанию ▸</button>
+        <div class="presets-label">Примеры для демонстрации:</div>
+        <div id="presets" class="presets"></div>
+      </div>
+      <div class="card">
+        <h3>Распознанные признаки</h3>
+        <div id="evidence" class="evidence"></div>
+      </div>
+      <div class="card grow">
+        <h3>Версии портрета</h3>
+        <div id="versions" class="versions"></div>
+      </div>
+    </section>
+
+    <!-- Центр: портрет -->
+    <section class="col col-center">
+      <div class="portrait-wrap">
+        <div id="portrait" class="portrait"></div>
+      </div>
+      <div class="portrait-actions">
+        <button id="btn-undo" class="tb" title="Отменить (Ctrl+Z)">↶ Отменить</button>
+        <button id="btn-redo" class="tb" title="Повторить (Ctrl+Y)">↷ Повторить</button>
+        <button id="btn-evolve" class="tb primary">Подбор «выбери похожее»</button>
+        <button id="btn-reset" class="tb">Сбросить черты</button>
+        <span class="hint">Точная подгонка — ползунками справа. Сохраняйте удачные варианты как версии.</span>
+      </div>
+    </section>
+
+    <!-- Правая колонка: ручная корректировка -->
+    <section class="col col-right">
+      <div class="card">
+        <h3>Черты лица</h3>
+        <div id="selects"></div>
+      </div>
+      <div class="card">
+        <h3>Тонкая настройка</h3>
+        <div id="sliders"></div>
+      </div>
+      <div class="card">
+        <div id="marks"></div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Оверлей проектов -->
+  <div id="projects-overlay" class="overlay">
+    <div class="overlay-box">
+      <div class="overlay-head">
+        <h3>Сохранённые проекты</h3>
+        <button id="btn-close-projects" class="tb">Закрыть</button>
+      </div>
+      <div id="projects-list" class="projects-list"></div>
+    </div>
+  </div>
+
+  <!-- Оверлей подбора «выбери похожее» -->
+  <div id="evolve-overlay" class="overlay">
+    <div class="overlay-box evolve-box">
+      <div class="overlay-head">
+        <div>
+          <h3>Подбор лица — «выбери похожее»</h3>
+          <div class="muted">Отметьте 1–2 наиболее похожих варианта и нажмите «Новое поколение» — система сблизится к цели. «Применить» перенесёт выбранный вариант в портрет.</div>
+        </div>
+        <button id="btn-close-evolve" class="tb">Закрыть</button>
+      </div>
+      <div id="evolve-grid" class="evolve-grid"></div>
+      <div class="evolve-controls">
+        <label class="ev-slider">Сила изменений
+          <input id="evolve-radius" type="range" min="0.2" max="1.2" step="0.05" value="0.8">
+        </label>
+        <button id="btn-evolve-next" class="tb primary">Новое поколение ▸</button>
+        <button id="btn-evolve-random" class="tb">Ещё варианты</button>
+        <span class="grow-sp"></span>
+        <span id="evolve-gen" class="muted"></span>
+        <button id="btn-evolve-apply" class="tb primary">Применить выбранный</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="js/traits.js"></script>
+  <script src="js/render.js"></script>
+  <script src="js/extract.js"></script>
+  <script src="js/store.js"></script>
+  <script src="js/report.js"></script>
+  <script src="js/evolve.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

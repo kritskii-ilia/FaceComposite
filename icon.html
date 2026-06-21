@@ -1,0 +1,35 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><style>html,body{margin:0;padding:0}</style></head><body>
+<svg width="256" height="256" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#4f8bff"/><stop offset="1" stop-color="#2a57c8"/>
+    </linearGradient>
+    <linearGradient id="head" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#e9eefc"/>
+    </linearGradient>
+  </defs>
+  <rect width="256" height="256" fill="url(#bg)"/>
+  <!-- сетка пропорций лица (намёк на «конструирование») -->
+  <g stroke="#ffffff" stroke-opacity="0.16" stroke-width="3">
+    <line x1="128" y1="34" x2="128" y2="150"/>
+    <line x1="44" y1="104" x2="212" y2="104"/>
+    <line x1="44" y1="138" x2="212" y2="138"/>
+    <line x1="44" y1="170" x2="212" y2="170"/>
+  </g>
+  <!-- плечи (бюст-силуэт портрета) -->
+  <path d="M44 250 C44 198 86 176 128 176 C170 176 212 198 212 250 Z" fill="url(#head)"/>
+  <!-- голова -->
+  <ellipse cx="128" cy="112" rx="58" ry="66" fill="url(#head)"/>
+  <!-- черты лица (минимум) -->
+  <g fill="#2a57c8">
+    <ellipse cx="108" cy="108" rx="7" ry="9"/>
+    <ellipse cx="148" cy="108" rx="7" ry="9"/>
+  </g>
+  <g fill="none" stroke="#2a57c8" stroke-width="5" stroke-linecap="round">
+    <path d="M96 86 q12 -7 24 0"/>
+    <path d="M136 86 q12 -7 24 0"/>
+    <path d="M128 120 l0 18 q-7 4 -12 2"/>
+    <path d="M112 150 q16 10 32 0"/>
+  </g>
+</svg>
+</body></html>

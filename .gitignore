@@ -1,0 +1,27 @@
+# Автономная сборка (245 МБ) — собирается через build_exe.bat
+dist/
+build/
+*.spec
+
+# Языковая модель Vosk (88 МБ) — скачивается отдельно, см. README
+models/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+
+# Системное
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Временные файлы редакторов
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
