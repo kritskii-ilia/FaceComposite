@@ -82,6 +82,7 @@
     [/шатен|тёмно-рус|темно-рус|тёмн\w*\s+волос|темн\w*\s+волос/i, 'hairColor', 'brown'],
     [/рус(ы|ые|ая|ый)|светло-рус/i, 'hairColor', 'lightBrown'],
     // растительность
+    [/выбрит|гладко выбр|чисто выбр|бритое лицо/i, 'facialHair', 'none'],
     [/густ\w*\s+бород|больш\w*\s+бород|окладист/i, 'facialHair', 'fullBeard'],
     [/эспаньол|козлин\w*\s+бород|бородк/i, 'facialHair', 'goatee'],
     [/борода|бород\w/i, 'facialHair', 'shortBeard'],
@@ -132,6 +133,16 @@
   const MARK_RULES_C = MARK_RULES.map((r) => [cyr(r[0]), r[1]]);
   const PARAM_RULES_C = PARAM_RULES.map((r) => [cyr(r[0]), r[1], r[2]]);
 
+  // Отрицание перед признаком: «без бороды», «без очков», «не было веснушек».
+  // Смотрим короткое окно слева от совпадения. «без/безо» + пробел, либо «не»
+  // (как отдельное слово) + до одного промежуточного слова. `\bне` не цепляет
+  // слова вида «неровный» (после требуется пробел).
+  const NEG_BEFORE = /(без|безо)\s+$|\bне\s+(\S+\s+)?$/i;
+  function negatedAt(text, idx) {
+    if (idx == null || idx < 0) return false;
+    return NEG_BEFORE.test(text.slice(Math.max(0, idx - 14), idx));
+  }
+
   function extract(text) {
     const t = (text || '').toLowerCase();
     const values = {};
@@ -144,6 +155,14 @@
       if (seen[key]) return;
       const mt = t.match(re);
       if (mt) {
+        if (negatedAt(t, mt.index)) {
+          // «без бороды/очков» — это явное отсутствие, а не пропуск признака.
+          if (key === 'glasses' || key === 'facialHair') {
+            values[key] = 'none'; seen[key] = true;
+            evidence.push({ trait: key, value: 'none', match: 'без ' + mt[0].trim() });
+          }
+          return; // для остальных признаков отрицание просто не выставляет значение
+        }
         values[key] = val;
         seen[key] = true;
         evidence.push({ trait: key, value: val, match: mt[0].trim() });
@@ -155,14 +174,18 @@
       const [re, mk] = r;
       if (marks.indexOf(mk) !== -1) return;
       const mt = t.match(re);
-      if (mt) { marks.push(mk); evidence.push({ trait: 'mark', value: mk, match: mt[0].trim() }); }
+      if (mt && !negatedAt(t, mt.index)) {
+        marks.push(mk); evidence.push({ trait: 'mark', value: mk, match: mt[0].trim() });
+      }
     });
 
     PARAM_RULES_C.forEach((r) => {
       const [re, key, val] = r;
       if (key in params) return;
       const mt = t.match(re);
-      if (mt) { params[key] = val; evidence.push({ trait: key, value: val, match: mt[0].trim() }); }
+      if (mt && !negatedAt(t, mt.index)) {
+        params[key] = val; evidence.push({ trait: key, value: val, match: mt[0].trim() });
+      }
     });
 
     return { values: values, params: params, marks: marks, evidence: evidence };
