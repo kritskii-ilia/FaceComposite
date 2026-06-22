@@ -217,20 +217,38 @@
 
   function browsGroup(m, profile) {
     const type = profile.values.eyebrows;
-    let thick = 5, arch = 8;
-    if (type === 'thin') thick = 3;
-    if (type === 'thick') thick = 9;
-    if (type === 'straight') arch = 1;
-    if (type === 'arched') arch = 14;
+    let thick = 6, arch = 8;
+    if (type === 'thin') thick = 4;
+    if (type === 'thick') thick = 11;
+    if (type === 'straight') arch = 2;
+    if (type === 'arched') arch = 15;
     const by = m.browLineY;
     const bw = 30;
+    // цвет бровей привязан к волосам (чуть темнее) — естественнее фиксированного
+    const hc = hairColor(profile);
+    const col = shade(hc, 0.6);
+    const dark = shade(hc, 0.42);
+    const SAMP = 7;
     let s = '';
     [+1, -1].forEach((side) => {
       const c = CX + side * m.eyeDX;
-      const inner = c - side * bw, outer = c + side * bw;
-      s += '<path d="M ' + n(inner) + ' ' + n(by + 3) +
-        ' Q ' + n(c) + ' ' + n(by - arch) + ' ' + n(outer) + ' ' + n(by + 1) +
-        '" fill="none" stroke="' + STROKE + '" stroke-width="' + thick + '" stroke-linecap="round"/>';
+      const A = [c - side * bw, by + 3];  // голова брови (у переносицы), полная
+      const B = [c, by - arch];           // дуга над зрачком
+      const C = [c + side * bw, by + 1];  // хвост, сходит на нет
+      const top = [], bot = [];
+      for (let i = 0; i <= SAMP; i++) {
+        const t = i / SAMP, mt = 1 - t;
+        const x = mt * mt * A[0] + 2 * mt * t * B[0] + t * t * C[0];
+        const y = mt * mt * A[1] + 2 * mt * t * B[1] + t * t * C[1];
+        const h = thick * 0.5 * Math.pow(1 - t, 0.62); // полная у головы → 0 у хвоста
+        top.push([x, y - h]);
+        bot.push([x, y + h]);
+      }
+      const pts = top.concat(bot.reverse());
+      s += '<path d="' + closedSpline(pts) + '" fill="' + col + '"/>';
+      // тёмная ось для глубины + лёгкая «волосковость» у головы
+      s += '<path d="M ' + n(A[0]) + ' ' + n(A[1]) + ' Q ' + n(B[0]) + ' ' + n(B[1]) + ' ' + n(C[0]) + ' ' + n(C[1]) +
+        '" fill="none" stroke="' + dark + '" stroke-width="1.2" opacity="0.5" stroke-linecap="round"/>';
     });
     return s;
   }
@@ -442,6 +460,9 @@
     const type = profile.values.facialHair;
     if (type === 'none') return '';
     const col = shade(hairColor(profile), 0.84);
+    const line = shade(col, 0.68);   // кромка
+    const sheen = shade(col, 1.28);  // блик в массе
+    const shadow = shade(col, 0.72); // верхняя тень бороды
     const y = m.mouthY;
     if (type === 'stubble') {
       // лёгкая тень по нижней части лица
@@ -456,22 +477,29 @@
     const mustache = '<path d="M ' + n(CX - 26) + ' ' + n(y - 12) +
       ' Q ' + n(CX) + ' ' + n(y - 4) + ' ' + n(CX + 26) + ' ' + n(y - 12) +
       ' Q ' + n(CX + 12) + ' ' + n(y - 2) + ' ' + n(CX) + ' ' + n(y - 2) +
-      ' Q ' + n(CX - 12) + ' ' + n(y - 2) + ' ' + n(CX - 26) + ' ' + n(y - 12) + ' Z" fill="' + col + '"/>';
+      ' Q ' + n(CX - 12) + ' ' + n(y - 2) + ' ' + n(CX - 26) + ' ' + n(y - 12) + ' Z" fill="' + col + '" stroke="' + line + '" stroke-width="1"/>';
     if (type === 'mustache') return mustache;
     if (type === 'goatee') {
       s += mustache;
       s += '<path d="M ' + n(CX - 16) + ' ' + n(y + 12) + ' Q ' + n(CX) + ' ' + n(y + 8) + ' ' + n(CX + 16) + ' ' + n(y + 12) +
         ' Q ' + n(CX + 14) + ' ' + n(m.chinY - 6) + ' ' + n(CX) + ' ' + n(m.chinY) +
-        ' Q ' + n(CX - 14) + ' ' + n(m.chinY - 6) + ' ' + n(CX - 16) + ' ' + n(y + 12) + ' Z" fill="' + col + '"/>';
+        ' Q ' + n(CX - 14) + ' ' + n(m.chinY - 6) + ' ' + n(CX - 16) + ' ' + n(y + 12) + ' Z" fill="' + col + '" stroke="' + line + '" stroke-width="1"/>';
       return s;
     }
     // борода: огибает нижнюю часть лица
     const jw = m.halves[4], jw2 = m.halves[5];
     const top = type === 'fullBeard' ? m.eyeLineY + 34 : m.noseBottomY;
-    s += '<path d="M ' + n(CX - jw - 2) + ' ' + n(top) +
+    const beardPath = 'M ' + n(CX - jw - 2) + ' ' + n(top) +
       ' C ' + n(CX - jw - 6) + ' ' + n(m.chinY) + ' ' + n(CX - jw2) + ' ' + n(m.chinY + 26) + ' ' + n(CX) + ' ' + n(m.chinY + 30) +
       ' C ' + n(CX + jw2) + ' ' + n(m.chinY + 26) + ' ' + n(CX + jw + 6) + ' ' + n(m.chinY) + ' ' + n(CX + jw + 2) + ' ' + n(top) +
-      ' Q ' + n(CX) + ' ' + n(m.noseBottomY + 18) + ' ' + n(CX - jw - 2) + ' ' + n(top) + ' Z" fill="' + col + '"/>';
+      ' Q ' + n(CX) + ' ' + n(m.noseBottomY + 18) + ' ' + n(CX - jw - 2) + ' ' + n(top) + ' Z';
+    s += '<path d="' + beardPath + '" fill="' + col + '" stroke="' + line + '" stroke-width="1.2"/>';
+    // объём бороды: верхняя тень + центральный блик, отсечены контуром бороды
+    s += '<clipPath id="beardClip"><path d="' + beardPath + '"/></clipPath>' +
+      '<g clip-path="url(#beardClip)" filter="url(#softBlur)">' +
+      '<ellipse cx="' + n(CX) + '" cy="' + n(top + 6) + '" rx="' + n(jw) + '" ry="16" fill="' + shadow + '" opacity="0.5"/>' +
+      '<ellipse cx="' + n(CX) + '" cy="' + n(m.chinY + 4) + '" rx="' + n(jw * 0.45) + '" ry="22" fill="' + sheen + '" opacity="0.4"/>' +
+      '</g>';
     s += mustache;
     return s;
   }
