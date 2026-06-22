@@ -107,25 +107,42 @@
     });
   }
 
+  // Подпись уровня уверенности распознавания (объяснимость для оператора).
+  const CONF = {
+    high: { label: 'уверенно', cls: 'conf-high' },
+    med: { label: 'вероятно', cls: 'conf-med' },
+    low: { label: 'предположительно', cls: 'conf-low' },
+  };
+
+  function evidenceLabel(ev) {
+    if (ev.trait === 'mark') {
+      const m = FC.traits.MARKS.find((x) => x.value === ev.value);
+      return m ? m.label : ev.value;
+    }
+    if (FC.traits.selectDef(ev.trait)) {
+      return FC.traits.selectDef(ev.trait).label + ': ' + FC.traits.optionLabel(ev.trait, ev.value);
+    }
+    // числовой признак — человекочитаемо, без «сырого» множителя
+    const sl = FC.traits.SLIDERS.find((s) => s.key === ev.trait);
+    if (sl) return sl.label + ': ' + (ev.value > sl.default ? 'больше обычного' : 'меньше обычного');
+    return ev.trait + ': ' + ev.value;
+  }
+
   function renderEvidence(evidence) {
     const host = document.getElementById('evidence');
     if (!evidence || !evidence.length) {
       host.innerHTML = '<div class="muted">Признаки пока не распознаны. Введите описание и нажмите «Собрать по описанию».</div>';
       return;
     }
-    host.innerHTML = '<div class="ev-title">Распознано (' + evidence.length + '):</div>';
+    const med = evidence.filter((e) => (e.conf || 'high') !== 'high').length;
+    host.innerHTML = '<div class="ev-title">Распознано (' + evidence.length + ')' +
+      (med ? ' · <span class="conf-dot conf-med"></span>' + med + ' оценочно' : '') + ':</div>';
     evidence.forEach((ev) => {
-      let label;
-      if (ev.trait === 'mark') {
-        const m = FC.traits.MARKS.find((x) => x.value === ev.value);
-        label = (m ? m.label : ev.value);
-      } else if (FC.traits.selectDef(ev.trait)) {
-        label = FC.traits.selectDef(ev.trait).label + ': ' + FC.traits.optionLabel(ev.trait, ev.value);
-      } else {
-        label = ev.trait + ': ' + ev.value;
-      }
+      const conf = CONF[ev.conf || 'high'] || CONF.high;
       const chip = el('div', 'ev-chip');
-      chip.innerHTML = '<b>' + label + '</b> <span class="muted">← «' + ev.match + '»</span>';
+      chip.innerHTML = '<span class="conf-dot ' + conf.cls + '" title="' + conf.label + '"></span>' +
+        '<b>' + evidenceLabel(ev) + '</b> <span class="muted">← «' + ev.match + '»</span> ' +
+        '<span class="conf-tag ' + conf.cls + '">' + conf.label + '</span>';
       host.appendChild(chip);
     });
   }

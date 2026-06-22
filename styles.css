@@ -99,8 +99,17 @@ button.voice.disabled { opacity: .5; cursor: not-allowed; }
 /* распознанное */
 .evidence { display: flex; flex-direction: column; gap: 5px; max-height: 180px; overflow: auto; }
 .ev-title { color: var(--muted); font-size: 12px; margin-bottom: 4px; }
-.ev-chip { background: var(--panel2); border: 1px solid var(--line); border-radius: 7px; padding: 5px 8px; font-size: 12px; }
+.ev-chip { background: var(--panel2); border: 1px solid var(--line); border-radius: 7px; padding: 5px 8px; font-size: 12px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .muted { color: var(--muted); font-size: 12px; }
+/* индикаторы уверенности распознавания */
+.conf-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex: 0 0 auto; }
+.conf-tag { margin-left: auto; font-size: 10px; text-transform: uppercase; letter-spacing: .3px; padding: 1px 6px; border-radius: 8px; }
+.conf-high { background: #2e7d4f; color: #cfeeda; }
+.conf-high.conf-dot { background: #43c07a; }
+.conf-med { background: #8a6d1e; color: #f3e4b8; }
+.conf-med.conf-dot { background: #d9aa3c; }
+.conf-low { background: #6a6f78; color: #e7ecf2; }
+.conf-low.conf-dot { background: #9aa0a8; }
 
 /* версии */
 .versions { display: flex; flex-direction: column; gap: 7px; overflow: auto; }

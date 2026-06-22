@@ -16,13 +16,13 @@
     // пол
     [/жен(щин|ск|\b)|девуш|девоч|дама/i, 'gender', 'female'],
     [/мужчин|муж(ско|чи)|парень|пацан|мальчик/i, 'gender', 'male'],
-    // возраст
-    [/ребён|ребен|\bдет(и|ей|ск)/i, 'ageBand', 'child'],
-    [/подрост|тинейдж/i, 'ageBand', 'teen'],
-    [/пожил|престарел|стар(ик|ая|ый)|в годах/i, 'ageBand', 'senior'],
-    [/средн\w*\s+возр|за сорок|под сорок|сорока?\s*лет|лет\s*сорок|лет\s*4[0-9]|4[0-9]\s*(лет|год)|45|50|пятьдес/i, 'ageBand', 'middle'],
-    [/молод|юнош|\b(18|20|25)\s*лет|двадцат/i, 'ageBand', 'young'],
-    [/тридцат|за тридцать|3[0-9]\s*(лет|год)|лет\s*3[0-9]/i, 'ageBand', 'adult'],
+    // возраст (всегда оценка — отсюда уверенность «вероятно»)
+    [/ребён|ребен|\bдет(и|ей|ск)/i, 'ageBand', 'child', 'med'],
+    [/подрост|тинейдж/i, 'ageBand', 'teen', 'med'],
+    [/пожил|престарел|стар(ик|ая|ый)|в годах/i, 'ageBand', 'senior', 'med'],
+    [/средн\w*\s+возр|за сорок|под сорок|сорока?\s*лет|лет\s*сорок|лет\s*4[0-9]|4[0-9]\s*(лет|год)|45|50|пятьдес/i, 'ageBand', 'middle', 'med'],
+    [/молод|юнош|\b(18|20|25)\s*лет|двадцат/i, 'ageBand', 'young', 'med'],
+    [/тридцат|за тридцать|3[0-9]\s*(лет|год)|лет\s*3[0-9]/i, 'ageBand', 'adult', 'med'],
     // тон кожи
     [/очень тёмн\w*\s+кож|очень темн\w*\s+кож|чёрнокож|чернокож|тёмнокож|темнокож/i, 'skinTone', 'dark'],
     [/тёмн\w*\s+кож|темн\w*\s+кож/i, 'skinTone', 'brown'],
@@ -92,14 +92,14 @@
     [/выбрит|гладко выбр|чисто выбр|бритое лицо/i, 'facialHair', 'none'],
     [/густ\w*\s+бород|больш\w*\s+бород|окладист/i, 'facialHair', 'fullBeard'],
     [/эспаньол|козлин\w*\s+бород|бородк/i, 'facialHair', 'goatee'],
-    [/борода|бород\w/i, 'facialHair', 'shortBeard'],
+    [/борода|бород\w/i, 'facialHair', 'shortBeard', 'med'],
     [/усат|усик|(^|[\s,.;:])ус(ы|ов|ам|ами)(?=[\s,.;:]|$)/i, 'facialHair', 'mustache'],
     [/щетин|небрит|трёхдневн|трехдневн/i, 'facialHair', 'stubble'],
     // очки
     [/солнцезащ|тёмн\w*\s+очк|чёрн\w*\s+очк|черн\w*\s+очк/i, 'glasses', 'sun'],
     [/прямоуголь\w*\s+очк/i, 'glasses', 'rectangular'],
     [/кругл\w*\s+очк/i, 'glasses', 'rounded'],
-    [/очк(и|ах|ов)/i, 'glasses', 'rounded'],
+    [/очк(и|ах|ов)/i, 'glasses', 'rounded', 'med'],
   ];
 
   // Особые приметы (множественные).
@@ -140,9 +140,11 @@
     s = s.replace(/\\s\+(волос|лиц|глаз|бров|нос|губ|подбород|уш)/g, '[а-яё ]{1,16}$1');
     return new RegExp(s, re.flags);
   }
-  const RULES_C = RULES.map((r) => [cyr(r[0]), r[1], r[2]]);
+  // 4-й элемент правила — уверенность: 'high' (явно назван), 'med' (оценка/допущение).
+  // По умолчанию категориальные правила = high, числовые (величины) = med.
+  const RULES_C = RULES.map((r) => [cyr(r[0]), r[1], r[2], r[3] || 'high']);
   const MARK_RULES_C = MARK_RULES.map((r) => [cyr(r[0]), r[1]]);
-  const PARAM_RULES_C = PARAM_RULES.map((r) => [cyr(r[0]), r[1], r[2]]);
+  const PARAM_RULES_C = PARAM_RULES.map((r) => [cyr(r[0]), r[1], r[2], r[3] || 'med']);
 
   // Отрицание перед признаком: «без бороды», «без очков», «не было веснушек».
   // Смотрим короткое окно слева от совпадения. «без/безо» + пробел, либо «не»
@@ -162,7 +164,7 @@
     const seen = {};
 
     RULES_C.forEach((r) => {
-      const [re, key, val] = r;
+      const [re, key, val, conf] = r;
       if (seen[key]) return;
       const mt = t.match(re);
       if (mt) {
@@ -170,13 +172,13 @@
           // «без бороды/очков» — это явное отсутствие, а не пропуск признака.
           if (key === 'glasses' || key === 'facialHair') {
             values[key] = 'none'; seen[key] = true;
-            evidence.push({ trait: key, value: 'none', match: 'без ' + mt[0].trim() });
+            evidence.push({ trait: key, value: 'none', match: 'без ' + mt[0].trim(), conf: 'high' });
           }
           return; // для остальных признаков отрицание просто не выставляет значение
         }
         values[key] = val;
         seen[key] = true;
-        evidence.push({ trait: key, value: val, match: mt[0].trim() });
+        evidence.push({ trait: key, value: val, match: mt[0].trim(), conf: conf });
       }
     });
 
@@ -186,16 +188,16 @@
       if (marks.indexOf(mk) !== -1) return;
       const mt = t.match(re);
       if (mt && !negatedAt(t, mt.index)) {
-        marks.push(mk); evidence.push({ trait: 'mark', value: mk, match: mt[0].trim() });
+        marks.push(mk); evidence.push({ trait: 'mark', value: mk, match: mt[0].trim(), conf: 'high' });
       }
     });
 
     PARAM_RULES_C.forEach((r) => {
-      const [re, key, val] = r;
+      const [re, key, val, conf] = r;
       if (key in params) return;
       const mt = t.match(re);
       if (mt && !negatedAt(t, mt.index)) {
-        params[key] = val; evidence.push({ trait: key, value: val, match: mt[0].trim() });
+        params[key] = val; evidence.push({ trait: key, value: val, match: mt[0].trim(), conf: conf });
       }
     });
 
