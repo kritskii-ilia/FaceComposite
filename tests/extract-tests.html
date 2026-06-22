@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="ru"><head><meta charset="utf-8">
+<title>Тесты разбора описания — FaceComposite</title>
+<style>
+  body { font-family:"Segoe UI",sans-serif; background:#14171c; color:#e7ecf2; margin:0; padding:20px; }
+  h1 { font-size:18px; }
+  .summary { font-size:22px; font-weight:700; padding:10px 16px; border-radius:10px; display:inline-block; margin-bottom:14px; }
+  .ok { background:#2e7d4f; } .bad { background:#c0392b; }
+  table { border-collapse:collapse; width:100%; font-size:13px; }
+  td,th { border:1px solid #2f3742; padding:6px 9px; text-align:left; vertical-align:top; }
+  th { color:#8c98a8; }
+  tr.pass td:first-child { color:#5fd08a; font-weight:700; }
+  tr.fail td:first-child { color:#ff7b7b; font-weight:700; }
+  tr.fail { background:#2a1d1d; }
+  code { color:#9fd0ff; }
+  .det { color:#8c98a8; }
+</style></head>
+<body>
+<h1>Тесты разбора описания (extract.js)</h1>
+<div id="summary" class="summary">Запуск…</div>
+<table id="t"><thead><tr><th>Итог</th><th>Описание</th><th>Ожидалось / Получено</th></tr></thead><tbody></tbody></table>
+
+<script src="../js/traits.js"></script>
+<script src="../js/extract.js"></script>
+<script>
+  // expect: { values:{k:v}, params:{k:v}, marks:[...], noMarks:[...], noValues:{k:v} }
+  const CASES = [
+    // --- тон кожи (новое) ---
+    ['смуглый мужчина', { values:{ skinTone:'tan', gender:'male' } }],
+    ['женщина с тёмной кожей', { values:{ skinTone:'brown', gender:'female' } }],
+    ['очень тёмная кожа', { values:{ skinTone:'dark' } }],
+    ['бледное лицо, светлые волосы', { values:{ skinTone:'pale' } }],
+    ['загорелый, спортивный', { values:{ skinTone:'tan' } }],
+    // --- отрицания ---
+    ['мужчина без бороды и без очков', { values:{ facialHair:'none', glasses:'none' } }],
+    ['женщина, не было веснушек', { noMarks:['freckles'] }],
+    ['гладко выбрит', { values:{ facialHair:'none' } }],
+    ['без родинок, но есть веснушки на носу', { marks:['freckles'], noMarks:['moleCheek'] }],
+    // --- усы: падежи и защита от ложных ---
+    ['мужчина с усами', { values:{ facialHair:'mustache' } }],
+    ['носит густые усы', { values:{ facialHair:'mustache' } }],
+    ['на шее красивые бусы', { noValues:{ facialHair:'mustache' } }],
+    // --- нос ---
+    ['приплюснутый нос', { values:{ nose:'snub' } }],
+    ['длинный прямой нос', { values:{ nose:'straight' }, params:{ noseLength:1.15 } }],
+    ['нос с горбинкой', { values:{ nose:'hooked' } }],
+    // --- губы / глаза / лоб ---
+    ['узкие губы', { values:{ lips:'thin' } }],
+    ['глаза навыкате', { values:{ eyes:'round' } }],
+    ['высокий лоб', { params:{ foreheadHeight:1.14 } }],
+    // --- возраст ---
+    ['мужчина за тридцать', { values:{ ageBand:'adult' } }],
+    ['ему лет 35', { values:{ ageBand:'adult' } }],
+    // --- комплексная фраза ---
+    ['Мужчина лет сорока, овальное лицо, тёмные короткие волосы, густые брови, прямой нос, карие глаза, короткая борода, шрам на щеке, очки',
+      { values:{ gender:'male', ageBand:'middle', faceShape:'oval', hairColor:'brown', hairStyle:'short', eyebrows:'thick', nose:'straight', eyeColor:'brown', facialHair:'shortBeard' }, marks:['scarCheek'] }],
+  ];
+
+  function check(text, expect) {
+    const r = FC.extract.extract(text);
+    const errs = [];
+    if (expect.values) for (const k in expect.values) if (r.values[k] !== expect.values[k]) errs.push(k+': ждали '+expect.values[k]+', получили '+(r.values[k]||'∅'));
+    if (expect.noValues) for (const k in expect.noValues) if (r.values[k] === expect.noValues[k]) errs.push(k+' не должно быть '+expect.noValues[k]);
+    if (expect.params) for (const k in expect.params) if (Math.abs((r.params[k]??-999) - expect.params[k]) > 0.001) errs.push('param '+k+': ждали '+expect.params[k]+', получили '+(r.params[k]??'∅'));
+    if (expect.marks) expect.marks.forEach(mk => { if (r.marks.indexOf(mk) === -1) errs.push('нет приметы '+mk); });
+    if (expect.noMarks) expect.noMarks.forEach(mk => { if (r.marks.indexOf(mk) !== -1) errs.push('лишняя примета '+mk); });
+    return { ok: errs.length === 0, errs, got: { values:r.values, marks:r.marks, params:r.params } };
+  }
+
+  const tb = document.querySelector('#t tbody');
+  let pass = 0;
+  CASES.forEach(([text, expect]) => {
+    const res = check(text, expect);
+    if (res.ok) pass++;
+    const tr = document.createElement('tr');
+    tr.className = res.ok ? 'pass' : 'fail';
+    const exp = JSON.stringify(expect).replace(/[{}"]/g,' ').trim();
+    const detail = res.ok ? '<span class="det">'+exp+'</span>'
+      : '<b>'+res.errs.join('; ')+'</b><br><span class="det">got: '+JSON.stringify(res.got)+'</span>';
+    tr.innerHTML = '<td>'+(res.ok?'PASS':'FAIL')+'</td><td>'+text+'</td><td>'+detail+'</td>';
+    tb.appendChild(tr);
+  });
+  const sm = document.getElementById('summary');
+  sm.textContent = pass + ' / ' + CASES.length + ' тестов пройдено';
+  sm.className = 'summary ' + (pass === CASES.length ? 'ok' : 'bad');
+  window.__passed = pass; window.__total = CASES.length;
+</script>
+</body></html>
