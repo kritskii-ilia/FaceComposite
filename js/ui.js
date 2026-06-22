@@ -128,14 +128,45 @@
     return ev.trait + ': ' + ev.value;
   }
 
-  function renderEvidence(evidence) {
+  function escapeHtml(s) {
+    return s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
+  }
+
+  // Подсветка фрагментов описания, по которым выставлены признаки: цвет = уверенность,
+  // приглушённый текст = слова, которые система не распознала. Перекрытия пропускаются.
+  function highlightDescription(text, evidence) {
+    const low = text.toLowerCase();
+    const ivs = [];
+    (evidence || []).forEach((ev) => {
+      const frag = (ev.match || '').toLowerCase().trim();
+      if (!frag) return;
+      const idx = low.indexOf(frag);
+      if (idx === -1) return;
+      ivs.push({ s: idx, e: idx + frag.length, conf: (ev.conf || 'high') });
+    });
+    ivs.sort((a, b) => a.s - b.s || b.e - a.e);
+    let out = '', pos = 0;
+    ivs.forEach((iv) => {
+      if (iv.s < pos) return;
+      out += escapeHtml(text.slice(pos, iv.s));
+      const cls = iv.conf === 'high' ? 'hl-high' : 'hl-med';
+      out += '<mark class="hl ' + cls + '">' + escapeHtml(text.slice(iv.s, iv.e)) + '</mark>';
+      pos = iv.e;
+    });
+    out += escapeHtml(text.slice(pos));
+    return out;
+  }
+
+  function renderEvidence(evidence, description) {
     const host = document.getElementById('evidence');
     if (!evidence || !evidence.length) {
       host.innerHTML = '<div class="muted">Признаки пока не распознаны. Введите описание и нажмите «Собрать по описанию».</div>';
       return;
     }
+    const parse = (description && description.trim())
+      ? '<div class="desc-parse">' + highlightDescription(description, evidence) + '</div>' : '';
     const med = evidence.filter((e) => (e.conf || 'high') !== 'high').length;
-    host.innerHTML = '<div class="ev-title">Распознано (' + evidence.length + ')' +
+    host.innerHTML = parse + '<div class="ev-title">Распознано (' + evidence.length + ')' +
       (med ? ' · <span class="conf-dot conf-med"></span>' + med + ' оценочно' : '') + ':</div>';
     evidence.forEach((ev) => {
       const conf = CONF[ev.conf || 'high'] || CONF.high;

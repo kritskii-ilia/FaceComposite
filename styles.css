@@ -110,6 +110,11 @@ button.voice.disabled { opacity: .5; cursor: not-allowed; }
 .conf-med.conf-dot { background: #d9aa3c; }
 .conf-low { background: #6a6f78; color: #e7ecf2; }
 .conf-low.conf-dot { background: #9aa0a8; }
+/* подсветка слов-источников в тексте описания */
+.desc-parse { background: var(--panel2); border: 1px solid var(--line); border-radius: 7px; padding: 8px 10px; font-size: 13px; line-height: 1.8; color: var(--muted); margin-bottom: 10px; }
+.desc-parse mark.hl { color: var(--text); background: transparent; border-radius: 3px; padding: 0 2px; }
+.desc-parse mark.hl-high { box-shadow: inset 0 -2px 0 #43c07a; background: rgba(67,192,122,.16); }
+.desc-parse mark.hl-med { box-shadow: inset 0 -2px 0 #d9aa3c; background: rgba(217,170,60,.16); }
 
 /* версии */
 .versions { display: flex; flex-direction: column; gap: 7px; overflow: auto; }

@@ -191,7 +191,7 @@
     res.marks.forEach((m) => { if (state.profile.marks.indexOf(m) === -1) state.profile.marks.push(m); });
     lastEvidence = res.evidence;
     FC.ui.sync(state.profile);
-    FC.ui.renderEvidence(res.evidence);
+    FC.ui.renderEvidence(res.evidence, state.description);
     render();
     pushHistory();
     return res;
