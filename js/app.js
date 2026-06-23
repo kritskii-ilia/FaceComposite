@@ -329,6 +329,7 @@
   }
 
   function renderEvolveGrid() {
+    hideCompare(); // регенерация галереи всегда возвращает к сетке
     const host = document.getElementById('evolve-grid');
     host.innerHTML = '';
     evolveState.cells = FC.evolve.generation(evolveState.center, evolveState.radius, 9, evolveState.locks);
@@ -365,6 +366,47 @@
   function evolveMore() {
     evolveState.radius = parseFloat(document.getElementById('evolve-radius').value) || evolveState.radius;
     renderEvolveGrid();
+  }
+
+  /* ---------- сравнение вариантов крупным планом ---------- */
+  function toggleGridControls(show) {
+    const c = document.querySelector('.evolve-controls');
+    if (c) c.style.display = show ? '' : 'none';
+  }
+  function hideCompare() {
+    const cmp = document.getElementById('evolve-compare');
+    if (cmp) cmp.style.display = 'none';
+    const grid = document.getElementById('evolve-grid');
+    if (grid) grid.style.display = '';
+    toggleGridControls(true);
+  }
+  // Показать 1–2 отмеченных варианта крупно рядом с текущим рабочим портретом —
+  // свидетелю проще решить, какой ближе к образу, без отвлекающих 6 других лиц.
+  function showCompare() {
+    const sel = [...evolveState.selected];
+    if (!sel.length) { toast('Отметьте 1–2 варианта для сравнения'); return; }
+    const faces = [{ label: 'Текущий портрет', prof: state.profile, ref: true }];
+    sel.slice(0, 2).forEach((i, k) => faces.push({ label: 'Вариант ' + (k + 1), prof: evolveState.cells[i], idx: i }));
+    const host = document.getElementById('evolve-compare');
+    host.innerHTML =
+      '<div class="cmp-head"><button id="btn-cmp-back" class="tb">← К галерее</button>' +
+      '<span class="muted">Сравнение крупным планом. «Применить» перенесёт вариант в рабочий портрет.</span></div>' +
+      '<div class="cmp-row">' + faces.map((f) =>
+        '<div class="cmp-card' + (f.ref ? ' ref' : '') + '">' +
+          '<div class="cmp-lab">' + f.label + '</div>' +
+          FC.render.buildSVG(f.prof) +
+          (f.ref ? '' : '<button class="tb cmp-apply" data-i="' + f.idx + '">Применить этот ▸</button>') +
+        '</div>').join('') + '</div>';
+    document.getElementById('btn-cmp-back').addEventListener('click', hideCompare);
+    host.querySelectorAll('.cmp-apply').forEach((b) => b.addEventListener('click', () => {
+      const i = parseInt(b.getAttribute('data-i'), 10);
+      state.profile = FC.evolve.clone(evolveState.cells[i]);
+      FC.ui.sync(state.profile); render(); pushHistory(); closeEvolve();
+      toast('Вариант применён — доработайте чертами справа');
+    }));
+    document.getElementById('evolve-grid').style.display = 'none';
+    host.style.display = '';
+    toggleGridControls(false);
   }
 
   function evolveApply() {
@@ -460,6 +502,7 @@
     document.getElementById('btn-close-evolve').addEventListener('click', closeEvolve);
     document.getElementById('btn-evolve-next').addEventListener('click', evolveNext);
     document.getElementById('btn-evolve-random').addEventListener('click', evolveMore);
+    document.getElementById('btn-evolve-compare').addEventListener('click', showCompare);
     document.getElementById('btn-evolve-apply').addEventListener('click', evolveApply);
     document.getElementById('evolve-radius').addEventListener('change', () => {
       if (evolveState) { evolveState.radius = parseFloat(document.getElementById('evolve-radius').value); renderEvolveGrid(); }
