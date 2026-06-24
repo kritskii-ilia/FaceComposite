@@ -182,6 +182,7 @@
   }
 
   let lastEvidence = [];
+  let nluToken = 0; // отменяет устаревшее обогащение, если описание сменилось
 
   function buildFromDescription() {
     state.description = document.getElementById('description').value;
@@ -189,12 +190,76 @@
     Object.keys(res.values).forEach((k) => { state.profile.values[k] = res.values[k]; });
     Object.keys(res.params).forEach((k) => { state.profile.params[k] = res.params[k]; });
     res.marks.forEach((m) => { if (state.profile.marks.indexOf(m) === -1) state.profile.marks.push(m); });
-    lastEvidence = res.evidence;
+    lastEvidence = res.evidence.slice();
     FC.ui.sync(state.profile);
-    FC.ui.renderEvidence(res.evidence, state.description);
+    FC.ui.renderEvidence(lastEvidence, state.description);
     render();
     pushHistory();
+    enrichWithNLU(res, state.description); // локальный нейро-fallback (если доступен)
     return res;
+  }
+
+  // Мост к локальному матчеру (nlu.py). Доступен только в нативном приложении —
+  // как и голос. В чистом браузере отсутствует, и сценарий работает на регекспах.
+  function interpretApi() {
+    return (window.pywebview && window.pywebview.api && window.pywebview.api.interpret)
+      ? window.pywebview.api : null;
+  }
+
+  /*
+   * Гибрид: регекспы (extract.js) уже отработали и выставили уверенные признаки.
+   * NLU дополняет ТОЛЬКО то, что регекспы не распознали, — правило «явное правило
+   * побеждает» сохраняет объяснимость. Категории/приметы, уже выставленные
+   * регекспом, не трогаем; для ползунков — не перетираем заданные регекспом.
+   */
+  async function enrichWithNLU(regexRes, descAtCall) {
+    const api = interpretApi();
+    if (!api) return;
+    const myToken = ++nluToken;
+    let res;
+    try {
+      res = await api.interpret(descAtCall, FC.traits.nluSchema());
+    } catch (e) {
+      return; // молча: NLU — необязательный слой
+    }
+    // описание успело смениться — результат устарел
+    if (myToken !== nluToken || descAtCall !== state.description) return;
+    if (!res) return;
+
+    const coveredSel = new Set(regexRes.evidence.filter((e) => e.trait !== 'mark').map((e) => e.trait));
+    const coveredMark = new Set(regexRes.marks);
+    const added = [];
+
+    Object.keys(res.values || {}).forEach((k) => {
+      if (coveredSel.has(k)) return;            // регекс уже выставил — не трогаем
+      state.profile.values[k] = res.values[k];
+      added.push(evOf(res, 'select', k));
+    });
+    Object.keys(res.params || {}).forEach((k) => {
+      if (coveredSel.has(k) || (k in regexRes.params)) return;
+      state.profile.params[k] = res.params[k];
+      added.push(evOf(res, 'param', k));
+    });
+    (res.marks || []).forEach((m) => {
+      if (coveredMark.has(m)) return;
+      if (state.profile.marks.indexOf(m) === -1) state.profile.marks.push(m);
+      added.push(evOf(res, 'mark', m));
+    });
+
+    const real = added.filter(Boolean);
+    if (!real.length) return;
+    lastEvidence = lastEvidence.concat(real);
+    FC.ui.sync(state.profile);
+    FC.ui.renderEvidence(lastEvidence, state.description);
+    render();
+    pushHistory();
+  }
+
+  // Достать запись evidence из ответа NLU по типу и ключу/значению.
+  function evOf(res, kind, key) {
+    return (res.evidence || []).find((e) =>
+      (kind === 'mark') ? (e.trait === 'mark' && e.value === key) : (e.trait === key)
+    ) || null;
   }
 
   /* ---------- версии ---------- */
