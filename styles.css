@@ -148,6 +148,13 @@ button.voice.disabled { opacity: .5; cursor: not-allowed; }
 .hist-item.current { opacity: 1; cursor: default; }
 .hist-item.current svg { border-color: var(--accent); }
 .hist-arrow { color: var(--muted); flex-shrink: 0; font-size: 14px; }
+/* архив веток: клик отмечает для сравнения крупным планом (не для отката) */
+.branch-item { position: relative; flex-shrink: 0; width: 58px; cursor: pointer; text-align: center; opacity: .85; }
+.branch-item:hover { opacity: 1; }
+.branch-item svg { width: 100%; height: auto; display: block; border-radius: 6px; border: 2px solid var(--line); background: #f3f1ec; }
+.branch-item .hist-lab { display: block; font-size: 10px; color: var(--muted); margin-top: 2px; }
+.branch-item.selected svg { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent) inset; }
+.branch-item.selected .hist-lab { color: var(--accent); }
 .evolve-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 6px 0 14px; }
 .evolve-card { position: relative; background: #f3f1ec; border: 3px solid var(--line); border-radius: 10px; padding: 4px; cursor: pointer; transition: border-color .12s, transform .12s; }
 .evolve-card:hover { transform: translateY(-2px); }

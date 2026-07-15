@@ -337,12 +337,14 @@
       radius: radius, gen: 1, cells: [], selected: new Set(),
       lockKeys: lockKeys, locks: new Set(lockKeys),
       history: [], // прошлые поколения: {gen, radius, center} — для отката и веток
+      branches: [], selectedBranches: new Set(), branchSeq: 0, // архив отброшенных веток
     };
     document.getElementById('evolve-radius').value = radius;
     applyEvolveMode();
     renderEvolveLocks();
     renderEvolveGrid();
     renderEvolveHistory();
+    renderEvolveBranches();
     document.getElementById('evolve-overlay').style.display = 'flex';
   }
   function closeEvolve() { document.getElementById('evolve-overlay').style.display = 'none'; }
@@ -470,6 +472,15 @@
 
   function jumpToEvolveHistory(idx) {
     const h = evolveState.history[idx];
+    // То, что было достигнуто дальше h, не теряется — уходит в архив веток,
+    // откуда его можно вызвать для сравнения крупным планом с новой веткой.
+    evolveState.branchSeq += 1;
+    evolveState.branches.push({
+      id: 'br' + evolveState.branchSeq,
+      label: 'Ветка · поколение ' + evolveState.gen,
+      center: FC.evolve.clone(evolveState.center),
+      gen: evolveState.gen,
+    });
     evolveState.center = FC.evolve.clone(h.center);
     evolveState.radius = h.radius;
     evolveState.gen = h.gen;
@@ -478,7 +489,31 @@
     renderEvolveLocks();
     renderEvolveGrid();
     renderEvolveHistory();
-    toast('Возврат к поколению ' + h.gen + ' — дальше пойдёт новая ветка подбора');
+    renderEvolveBranches();
+    toast('Возврат к поколению ' + h.gen + ' — прошлая ветка сохранена, доступна в «Сохранённых ветках»');
+  }
+
+  // Архив веток: отмеченные (клик по карточке) можно вызвать в сравнении
+  // крупным планом рядом с текущим результатом — «наглядное сравнение ветвей».
+  function renderEvolveBranches() {
+    const host = document.getElementById('evolve-branches');
+    if (!host) return;
+    if (!evolveState.branches.length) { host.style.display = 'none'; host.innerHTML = ''; return; }
+    host.style.display = 'flex';
+    host.innerHTML = '<span class="hist-title">Сохранённые ветки (для сравнения):</span>';
+    evolveState.branches.forEach((b) => {
+      const item = document.createElement('div');
+      const on = evolveState.selectedBranches.has(b.id);
+      item.className = 'branch-item' + (on ? ' selected' : '');
+      item.innerHTML = FC.render.buildSVG(b.center) + '<span class="hist-lab">' + b.label + '</span>';
+      item.title = 'Отметить для сравнения';
+      item.addEventListener('click', () => {
+        if (evolveState.selectedBranches.has(b.id)) evolveState.selectedBranches.delete(b.id);
+        else evolveState.selectedBranches.add(b.id);
+        renderEvolveBranches();
+      });
+      host.appendChild(item);
+    });
   }
 
   /* ---------- сравнение вариантов крупным планом ---------- */
@@ -493,27 +528,41 @@
     if (grid) grid.style.display = '';
     toggleGridControls(true);
   }
-  // Показать 1–2 отмеченных варианта крупно рядом с текущим рабочим портретом —
-  // свидетелю проще решить, какой ближе к образу, без отвлекающих 6 других лиц.
+  // Показать отмеченные варианты крупно рядом с текущим рабочим портретом —
+  // свидетелю проще решить, какой ближе к образу, без отвлекающих других лиц.
+  // Источник вариантов — галерея ТЕКУЩЕЙ ветки и/или архив прошлых веток
+  // («наглядное сравнение ветвей»): любая их комбинация, до 3 штук.
   function showCompare() {
     const sel = [...evolveState.selected];
-    if (!sel.length) { toast('Отметьте 1–2 варианта для сравнения'); return; }
+    const brSel = [...evolveState.selectedBranches];
+    if (!sel.length && !brSel.length) {
+      toast('Отметьте варианты в галерее и/или сохранённые ветки для сравнения');
+      return;
+    }
     const faces = [{ label: 'Текущий портрет', prof: state.profile, ref: true }];
-    sel.slice(0, 2).forEach((i, k) => faces.push({ label: 'Вариант ' + (k + 1), prof: evolveState.cells[i], idx: i }));
+    sel.forEach((i) => faces.push({ label: 'Вариант ' + faces.length, prof: evolveState.cells[i], kind: 'cell', key: i }));
+    brSel.forEach((id) => {
+      const b = evolveState.branches.find((x) => x.id === id);
+      if (b) faces.push({ label: b.label, prof: b.center, kind: 'branch', key: id });
+    });
+    const shown = [faces[0]].concat(faces.slice(1, 4)); // текущий + максимум 3 варианта
     const host = document.getElementById('evolve-compare');
     host.innerHTML =
       '<div class="cmp-head"><button id="btn-cmp-back" class="tb">← К галерее</button>' +
       '<span class="muted">Сравнение крупным планом. «Применить» перенесёт вариант в рабочий портрет.</span></div>' +
-      '<div class="cmp-row">' + faces.map((f) =>
+      '<div class="cmp-row">' + shown.map((f) =>
         '<div class="cmp-card' + (f.ref ? ' ref' : '') + '">' +
           '<div class="cmp-lab">' + f.label + '</div>' +
           FC.render.buildSVG(f.prof) +
-          (f.ref ? '' : '<button class="tb cmp-apply" data-i="' + f.idx + '">Применить этот ▸</button>') +
+          (f.ref ? '' : '<button class="tb cmp-apply" data-kind="' + f.kind + '" data-key="' + f.key + '">Применить этот ▸</button>') +
         '</div>').join('') + '</div>';
     document.getElementById('btn-cmp-back').addEventListener('click', hideCompare);
-    host.querySelectorAll('.cmp-apply').forEach((b) => b.addEventListener('click', () => {
-      const i = parseInt(b.getAttribute('data-i'), 10);
-      state.profile = FC.evolve.clone(evolveState.cells[i]);
+    host.querySelectorAll('.cmp-apply').forEach((btn) => btn.addEventListener('click', () => {
+      const kind = btn.getAttribute('data-kind'), key = btn.getAttribute('data-key');
+      const prof = kind === 'branch'
+        ? evolveState.branches.find((x) => x.id === key).center
+        : evolveState.cells[parseInt(key, 10)];
+      state.profile = FC.evolve.clone(prof);
       FC.ui.sync(state.profile); render(); pushHistory(); closeEvolve();
       toast('Вариант применён — доработайте чертами справа');
     }));
