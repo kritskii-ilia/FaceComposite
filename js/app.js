@@ -336,11 +336,13 @@
       center: FC.evolve.clone(state.profile),
       radius: radius, gen: 1, cells: [], selected: new Set(),
       lockKeys: lockKeys, locks: new Set(lockKeys),
+      history: [], // прошлые поколения: {gen, radius, center} — для отката и веток
     };
     document.getElementById('evolve-radius').value = radius;
     applyEvolveMode();
     renderEvolveLocks();
     renderEvolveGrid();
+    renderEvolveHistory();
     document.getElementById('evolve-overlay').style.display = 'flex';
   }
   function closeEvolve() { document.getElementById('evolve-overlay').style.display = 'none'; }
@@ -418,6 +420,12 @@
 
   function evolveNext() {
     const sel = [...evolveState.selected].map((i) => evolveState.cells[i]);
+    // Текущее поколение уходит в историю ДО перехода к следующему — так к нему
+    // всегда можно вернуться и продолжить подбор в другую сторону (новая ветка).
+    evolveState.history.push({
+      gen: evolveState.gen, radius: evolveState.radius,
+      center: FC.evolve.clone(evolveState.center),
+    });
     if (sel.length) {
       evolveState.center = FC.evolve.average(sel, evolveState.locks);
       evolveState.radius = Math.max(0.2, evolveState.radius * 0.72); // сужаем разброс
@@ -426,11 +434,51 @@
     evolveState.gen += 1;
     renderEvolveLocks(); // подписи замков зависят от центра — мог измениться
     renderEvolveGrid();
+    renderEvolveHistory();
   }
 
   function evolveMore() {
     evolveState.radius = parseFloat(document.getElementById('evolve-radius').value) || evolveState.radius;
     renderEvolveGrid();
+  }
+
+  // Полоса истории поколений: клик по прошлому шагу откатывает подбор к нему
+  // и обрезает всё, что шло после, — дальше пойдёт новая ветка от этой точки.
+  function renderEvolveHistory() {
+    const host = document.getElementById('evolve-history');
+    if (!host) return;
+    if (!evolveState.history.length) { host.style.display = 'none'; host.innerHTML = ''; return; }
+    host.style.display = 'flex';
+    host.innerHTML = '<span class="hist-title">История:</span>';
+    evolveState.history.forEach((h, idx) => {
+      const item = document.createElement('div');
+      item.className = 'hist-item';
+      item.innerHTML = FC.render.buildSVG(h.center) + '<span class="hist-lab">Пок. ' + h.gen + '</span>';
+      item.title = 'Вернуться к поколению ' + h.gen;
+      item.addEventListener('click', () => jumpToEvolveHistory(idx));
+      host.appendChild(item);
+      const arrow = document.createElement('span');
+      arrow.className = 'hist-arrow'; arrow.textContent = '→';
+      host.appendChild(arrow);
+    });
+    const cur = document.createElement('div');
+    cur.className = 'hist-item current';
+    cur.innerHTML = FC.render.buildSVG(evolveState.center) + '<span class="hist-lab">Пок. ' + evolveState.gen + '</span>';
+    cur.title = 'Текущее поколение';
+    host.appendChild(cur);
+  }
+
+  function jumpToEvolveHistory(idx) {
+    const h = evolveState.history[idx];
+    evolveState.center = FC.evolve.clone(h.center);
+    evolveState.radius = h.radius;
+    evolveState.gen = h.gen;
+    evolveState.history = evolveState.history.slice(0, idx); // остальное — новая ветка
+    document.getElementById('evolve-radius').value = evolveState.radius;
+    renderEvolveLocks();
+    renderEvolveGrid();
+    renderEvolveHistory();
+    toast('Возврат к поколению ' + h.gen + ' — дальше пойдёт новая ветка подбора');
   }
 
   /* ---------- сравнение вариантов крупным планом ---------- */

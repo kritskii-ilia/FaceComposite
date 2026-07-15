@@ -138,6 +138,16 @@ button.voice.disabled { opacity: .5; cursor: not-allowed; }
 .lock-chip { background: var(--panel2); color: var(--text); border: 1px solid var(--accent); border-radius: 14px; padding: 4px 10px; font-size: 12px; cursor: pointer; }
 .lock-chip:hover { background: var(--panel); }
 .lock-chip.off { border-color: var(--line); color: var(--muted); opacity: .8; }
+/* история поколений подбора: клик по прошлому шагу — откат и новая ветка */
+.evolve-history { display: flex; align-items: center; gap: 8px; overflow-x: auto; margin: 0 0 10px; padding-bottom: 2px; }
+.evolve-history .hist-title { color: var(--muted); font-size: 12px; flex-shrink: 0; }
+.hist-item { position: relative; flex-shrink: 0; width: 52px; cursor: pointer; text-align: center; opacity: .8; transition: opacity .12s, transform .12s; }
+.hist-item:hover { opacity: 1; transform: translateY(-1px); }
+.hist-item svg { width: 100%; height: auto; display: block; border-radius: 6px; border: 2px solid var(--line); background: #f3f1ec; }
+.hist-item .hist-lab { display: block; font-size: 10px; color: var(--muted); margin-top: 2px; }
+.hist-item.current { opacity: 1; cursor: default; }
+.hist-item.current svg { border-color: var(--accent); }
+.hist-arrow { color: var(--muted); flex-shrink: 0; font-size: 14px; }
 .evolve-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 6px 0 14px; }
 .evolve-card { position: relative; background: #f3f1ec; border: 3px solid var(--line); border-radius: 10px; padding: 4px; cursor: pointer; transition: border-color .12s, transform .12s; }
 .evolve-card:hover { transform: translateY(-2px); }
