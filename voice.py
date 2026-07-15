@@ -37,6 +37,26 @@ class Dictation:
         self.parts = []
         self.partial = ""
         self.error = ""
+        self.preferred_device = None  # индекс устройства, выбранный оператором (None = авто)
+
+    def set_device(self, index):
+        """Запомнить устройство ввода для следующего start(). index=None/-1 — авто
+        (системное по умолчанию, либо первый найденный микрофон)."""
+        self.preferred_device = None if index is None or index == -1 else index
+
+    def list_devices(self):
+        """Микрофоны системы: [{index, name}]. Пусто — если sounddevice недоступен
+        или их нет. Используется для выпадающего списка в UI оператора."""
+        if not _DEPS_OK:
+            return []
+        out = []
+        try:
+            for i, dev in enumerate(sd.query_devices()):
+                if dev.get("max_input_channels", 0) > 0:
+                    out.append({"index": i, "name": dev.get("name", "Микрофон %d" % i)})
+        except Exception:
+            return []
+        return out
 
     def available(self):
         return _DEPS_OK and os.path.isdir(self.model_dir)
@@ -57,7 +77,10 @@ class Dictation:
 
     def _input_device(self):
         """Вернуть индекс входного устройства; None — использовать системное по
-        умолчанию. Если умолчания нет (-1), берём первый микрофон в системе."""
+        умолчанию. Если умолчания нет (-1), берём первый микрофон в системе.
+        Явный выбор оператора (set_device) имеет приоритет над автовыбором."""
+        if self.preferred_device is not None:
+            return self.preferred_device
         try:
             dd = sd.default.device
             di = dd[0] if isinstance(dd, (list, tuple)) else dd

@@ -138,6 +138,11 @@
       return;
     }
     if (!dictating) {
+      if (api.voice_set_device) {
+        const sel = document.getElementById('voice-device');
+        const idx = sel && sel.value !== '' ? parseInt(sel.value, 10) : -1;
+        await api.voice_set_device(idx);
+      }
       const ok = await api.voice_start();
       if (!ok) { toast('Микрофон недоступен: ' + (await api.voice_status())); return; }
       dictating = true;
@@ -176,9 +181,27 @@
       b.classList.toggle('disabled', !ok);
       b.title = ok ? 'Офлайн-распознавание речи (Vosk, русский)'
                    : 'Модель распознавания не найдена: ' + (await api.voice_status());
+      if (ok) await fillVoiceDevices(api);
     };
     window.addEventListener('pywebviewready', check);
     check();
+  }
+
+  // Список микрофонов системы — выбор нужен, когда в приложении их несколько
+  // (например, встроенный + гарнитура) и системный по умолчанию не тот.
+  async function fillVoiceDevices(api) {
+    const sel = document.getElementById('voice-device');
+    if (!sel || !api.voice_devices) return;
+    let devices = [];
+    try { devices = await api.voice_devices(); } catch (e) { devices = []; }
+    if (!devices.length) { sel.style.display = 'none'; return; }
+    sel.innerHTML = '<option value="">Микрофон по умолчанию</option>' +
+      devices.map((d) => '<option value="' + d.index + '">' + escapeHtmlLocal(d.name) + '</option>').join('');
+    sel.style.display = '';
+  }
+
+  function escapeHtmlLocal(s) {
+    return String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
   }
 
   let lastEvidence = [];

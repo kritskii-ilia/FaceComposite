@@ -47,6 +47,13 @@ class Api:
     def voice_status(self):
         return self.dictation.status()
 
+    def voice_devices(self):
+        return self.dictation.list_devices()
+
+    def voice_set_device(self, index):
+        self.dictation.set_device(index)
+        return True
+
     def voice_start(self):
         return self.dictation.start()
 
