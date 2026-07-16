@@ -694,12 +694,28 @@
     });
   }
 
+  // В нативном приложении подтягиваем проекты из файлового зеркала
+  // (%APPDATA%\FaceComposite\projects) поверх localStorage — актуально после
+  // переустановки .exe или переноса на другую машину, где localStorage пуст.
+  // Открытая панель «Проекты» в этот момент — редкий случай (мост готовится
+  // сразу при старте), но перерисовываем на всякий случай.
+  function initProjectsSync() {
+    window.addEventListener('pywebviewready', () => {
+      FC.store.syncFromNative().then((changed) => {
+        if (changed && document.getElementById('projects-overlay').style.display !== 'none') {
+          openProjects();
+        }
+      });
+    });
+  }
+
   function init() {
     state = newCaseState();
     FC.ui.mount(handlers);
     bindToolbar();
     buildPresets();
     initVoiceAvailability();
+    initProjectsSync();
     syncMeta();
     render();
     historyInit();

@@ -1,7 +1,14 @@
 /*
  * store.js — локальное хранение и экспорт. Всё строго офлайн:
- *   - проекты лежат в localStorage браузера (на этапе native-обёртки заменится
- *     на файловое хранилище в %APPDATA%, контракт сохраняем);
+ *   - проекты лежат в localStorage браузера (быстрое синхронное хранилище —
+ *     весь остальной код читает/пишет проекты синхронно и это не меняем);
+ *   - в нативном приложении (.exe / Запустить.bat) поверх localStorage работает
+ *     файловое зеркало в %APPDATA%\FaceComposite\projects (см. projects.py):
+ *     saveCase/deleteCase best-effort дублируют туда запись в фоне, а
+ *     syncFromNative() при старте подтягивает файлы обратно в localStorage.
+ *     Так проекты переживают переустановку .exe или перенос на другую
+ *     машину — localStorage привязан к профилю WebView2 и при переустановке
+ *     пропадает, файлы — нет;
  *   - экспорт/импорт проекта — через скачивание/загрузку JSON-файла;
  *   - экспорт портрета — рендер SVG в PNG через canvas, без сети.
  */
@@ -10,21 +17,57 @@
 
   const LS_KEY = 'facecomposite.cases.v1';
 
-  function listCases() {
+  function projectsApi() {
+    return (window.pywebview && window.pywebview.api && window.pywebview.api.projects_list)
+      ? window.pywebview.api : null;
+  }
+
+  function readLS() {
     try { return JSON.parse(localStorage.getItem(LS_KEY) || '{}'); }
     catch (e) { return {}; }
   }
+  function writeLS(all) { localStorage.setItem(LS_KEY, JSON.stringify(all)); }
+
+  function listCases() { return readLS(); }
+
   function saveCase(caseObj) {
-    const all = listCases();
+    const all = readLS();
     caseObj.updatedAt = new Date().toISOString();
     all[caseObj.id] = caseObj;
-    localStorage.setItem(LS_KEY, JSON.stringify(all));
+    writeLS(all);
+    // Файловая копия — best-effort и в фоне: не блокирует и не может сорвать
+    // основное сохранение в localStorage, даже если мост недоступен/упал.
+    const api = projectsApi();
+    if (api) { try { api.projects_save(caseObj).catch(() => {}); } catch (e) { /* ignore */ } }
   }
-  function loadCase(id) { return listCases()[id] || null; }
+  function loadCase(id) { return readLS()[id] || null; }
   function deleteCase(id) {
-    const all = listCases();
+    const all = readLS();
     delete all[id];
-    localStorage.setItem(LS_KEY, JSON.stringify(all));
+    writeLS(all);
+    const api = projectsApi();
+    if (api) { try { api.projects_delete(id).catch(() => {}); } catch (e) { /* ignore */ } }
+  }
+
+  // Вызывается один раз при старте нативного приложения (пока UI ещё не читал
+  // список проектов). Подтягивает файлы поверх localStorage там, где файл
+  // новее (или запись в localStorage вовсе отсутствует, например после
+  // переустановки .exe). Возвращает true, если что-то реально обновилось —
+  // вызывающий код может решить перерисовать список проектов.
+  function syncFromNative() {
+    const api = projectsApi();
+    if (!api) return Promise.resolve(false);
+    return api.projects_list().then((fileCases) => {
+      if (!fileCases || !Object.keys(fileCases).length) return false;
+      const ls = readLS();
+      let changed = false;
+      Object.keys(fileCases).forEach((id) => {
+        const f = fileCases[id], l = ls[id];
+        if (!l || (f.updatedAt || '') > (l.updatedAt || '')) { ls[id] = f; changed = true; }
+      });
+      if (changed) writeLS(ls);
+      return changed;
+    }).catch(() => false);
   }
 
   function download(filename, blob) {
@@ -99,6 +142,7 @@
 
   FC.store = {
     listCases: listCases, saveCase: saveCase, loadCase: loadCase, deleteCase: deleteCase,
+    syncFromNative: syncFromNative,
     exportCaseJSON: exportCaseJSON, importCaseJSON: importCaseJSON,
     exportPNG: exportPNG, exportRasterPNG: exportRasterPNG, exportSVG: exportSVG, safeName: safeName,
   };

@@ -15,6 +15,7 @@ import webview
 
 from voice import Dictation
 from nlu import get_nlu
+import projects
 
 # В упакованном виде (PyInstaller) ресурсы лежат во временной папке _MEIPASS,
 # в обычном запуске — рядом с app.py.
@@ -88,6 +89,25 @@ class Api:
             return self._get_nlu().interpret(text, schema)
         except Exception as e:
             return {"values": {}, "params": {}, "marks": [], "evidence": [], "error": str(e)}
+
+    # ---- файловое зеркало проектов в %APPDATA% (см. projects.py) ----
+    def projects_list(self):
+        try:
+            return projects.list_cases()
+        except Exception:
+            return {}
+
+    def projects_save(self, case_obj):
+        try:
+            return projects.save_case(case_obj)
+        except Exception:
+            return False
+
+    def projects_load(self, case_id):
+        return projects.load_case(case_id)
+
+    def projects_delete(self, case_id):
+        return projects.delete_case(case_id)
 
 
 def main():
