@@ -13,6 +13,10 @@ py -m PyInstaller --noconfirm --noconsole --name "FaceComposite" ^
   --collect-all clr_loader ^
   --collect-all vosk ^
   --collect-all sounddevice ^
+  --exclude-module matplotlib ^
+  --exclude-module tkinter ^
+  --exclude-module _tkinter ^
+  --exclude-module test ^
   app.py
 echo.
 echo Готово. Приложение: dist\FaceComposite\FaceComposite.exe
