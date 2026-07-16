@@ -699,6 +699,12 @@
     document.getElementById('btn-redo').addEventListener('click', redo);
     document.addEventListener('keydown', (e) => {
       if (!(e.ctrlKey || e.metaKey)) return;
+      // Пока фокус в текстовом поле (описание, название дела, оператор) —
+      // Ctrl+Z/Ctrl+Y должны отменять/повторять НАБОР ТЕКСТА (родное поведение
+      // поля), а не откатывать портрет. Иначе опечатка при вводе описания
+      // молча возвращает лицо к прошлой черте вместо исправления текста.
+      const tag = (e.target && e.target.tagName || '').toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || (e.target && e.target.isContentEditable)) return;
       const k = e.key.toLowerCase();
       if (k === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
       else if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); redo(); }
