@@ -347,6 +347,16 @@
     c.profile.values = Object.assign({}, base.profile.values, c.profile.values || {});
     c.profile.params = Object.assign({}, base.profile.params, c.profile.params || {});
     c.profile.marks = c.profile.marks || [];
+    // Значение категориального признака, которого больше нет среди опций
+    // (старый экспорт после переименования варианта, руками подправленный
+    // файл) — рендер сам подставит дефолт молча, но <select> в UI останется
+    // пустым, а «призрачное» значение будет расползаться по следующим
+    // сохранениям/экспортам. Возвращаем его на дефолт прямо тут, один раз.
+    FC.traits.SELECTS.forEach((def) => {
+      const v = c.profile.values[def.key];
+      if (!def.options.some((o) => o.value === v)) c.profile.values[def.key] = def.default;
+    });
+    c.profile.marks = c.profile.marks.filter((mk) => FC.traits.MARKS.some((m) => m.value === mk));
     c.versions = c.versions || [];
     return c;
   }
