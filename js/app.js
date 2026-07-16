@@ -329,9 +329,20 @@
     document.getElementById('projects-overlay').style.display = show ? 'flex' : 'none';
   }
 
-  // подстраховка на случай старых/частичных карточек
+  // подстраховка на случай старых/частичных/случайно выбранных не-.fcase.json
+  // файлов: любое валидное, но «не то» значение (не объект, пустой объект,
+  // без id) не должно оставлять в состоянии буквальный undefined — иначе он
+  // всплывает в полях UI («undefined» в названии) и, что хуже, карточка без
+  // id при сохранении молча перезапишет любую другую такую же карточку.
   function normalize(c) {
     const base = newCaseState();
+    if (!c || typeof c !== 'object' || Array.isArray(c)) c = {};
+    c.id = c.id || base.id;
+    c.title = c.title || base.title;
+    c.operator = c.operator || base.operator;
+    c.subjectType = c.subjectType || base.subjectType;
+    c.createdAt = c.createdAt || base.createdAt;
+    c.description = c.description || base.description;
     c.profile = c.profile || base.profile;
     c.profile.values = Object.assign({}, base.profile.values, c.profile.values || {});
     c.profile.params = Object.assign({}, base.profile.params, c.profile.params || {});
