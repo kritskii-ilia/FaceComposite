@@ -538,7 +538,10 @@
         s += '<circle cx="' + n(CX - m.halves[4] * 0.4) + '" cy="' + n(m.noseBottomY) + '" r="3.4" fill="#5a3b28"/>';
       }
       if (mark === 'moleLip') {
-        s += '<circle cx="' + n(CX + 22) + '" cy="' + n(m.mouthY + 12) + '" r="3" fill="#5a3b28"/>';
+        // У уголка рта: ширина рта зависит от mouthSize и формы губ (см.
+        // mouthGroup) — без этого родинка «съезжает» с губ на узком/широком рте.
+        const mw = (profile.values.lips === 'wide' ? 52 : 42) * (profile.params.mouthSize || 1);
+        s += '<circle cx="' + n(CX + mw / 2 * 1.05) + '" cy="' + n(m.mouthY + 12) + '" r="3" fill="#5a3b28"/>';
       }
       if (mark === 'freckles') {
         for (let i = 0; i < 18; i++) {
