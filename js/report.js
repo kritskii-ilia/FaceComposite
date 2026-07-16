@@ -17,11 +17,19 @@
   }
 
   // Простой перенос по словам под фиксированную ширину строки (в символах).
+  // Слово длиннее самой строки (например, склеенное дефисами название без
+  // пробелов) режем жёстко — иначе оно вылезет за край листа целиком.
   function wrap(text, max) {
     const words = String(text || '').split(/\s+/);
     const lines = [];
     let cur = '';
-    words.forEach((w) => {
+    words.forEach((w0) => {
+      let w = w0;
+      while (w.length > max) {
+        if (cur) { lines.push(cur); cur = ''; }
+        lines.push(w.slice(0, max));
+        w = w.slice(max);
+      }
       if ((cur + ' ' + w).trim().length > max) {
         if (cur) lines.push(cur);
         cur = w;
@@ -62,7 +70,24 @@
     const x = 430;
     let y = 142;
     const label = (t) => { const r = '<text x="' + x + '" y="' + y + '" font-size="15" font-weight="700" fill="#14181f">' + esc(t) + '</text>'; y += 25; return r; };
-    const row = (k, v) => { const r = '<text x="' + x + '" y="' + y + '" font-size="13.5" fill="#222"><tspan fill="#8a8a8a">' + esc(k) + ': </tspan>' + esc(v) + '</text>'; y += 20; return r; };
+    // Длинные значения (название дела, список примет) переносим по словам —
+    // иначе текст молча вылезает за правый край листа и часть теряется.
+    const ROW_MAX_CHARS = 50;
+    const row = (k, v) => {
+      const full = k + ': ' + (v == null || v === '' ? '—' : String(v));
+      let r = '';
+      wrap(full, ROW_MAX_CHARS).forEach((ln, i) => {
+        if (i === 0) {
+          const prefix = k + ':';
+          const rest = ln.slice(prefix.length);
+          r += '<text x="' + x + '" y="' + y + '" font-size="13.5" fill="#222"><tspan fill="#8a8a8a">' + esc(prefix) + '</tspan>' + esc(rest) + '</text>';
+        } else {
+          r += '<text x="' + x + '" y="' + y + '" font-size="13.5" fill="#222">' + esc(ln) + '</text>';
+        }
+        y += 20;
+      });
+      return r;
+    };
 
     s += label('ДАННЫЕ');
     s += row('Дело', meta.title || '—');
